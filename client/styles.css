@@ -1,0 +1,841 @@
+/* ==========================================================================
+   Virtual Gamepad - Stealth Matte Hardware Aesthetic
+   Theme: Matte-Black Polymer Hardware with Tactile 3D Depth & Electric-Yellow (#FACC15) Accents
+   ========================================================================== */
+
+:root {
+    /* Color Palette */
+    --hw-black-dark: #080a0e;
+    --hw-black-base: #0b0d10;
+    --hw-black-light: #14181f;
+    --hw-surface-raised: #1c212c;
+    --hw-surface-highlight: #272d3b;
+    --hw-seam-dark: rgba(0, 0, 0, 0.85);
+    --hw-seam-light: rgba(255, 255, 255, 0.06);
+
+    /* Electric Yellow Accent */
+    --accent-yellow: #facc15;
+    --accent-yellow-glow: rgba(250, 204, 21, 0.85);
+    --accent-yellow-dim: rgba(250, 204, 21, 0.25);
+
+    /* Text & Status Colors */
+    --text-primary: #e6edf3;
+    --text-dim: #8b949e;
+    --text-dark: #484f58;
+    --status-green: #10b981;
+    --status-amber: #f59e0b;
+    --status-red: #ef4444;
+
+    /* Xbox Legend Subtle Accents */
+    --legend-a: #10b981;
+    --legend-b: #ef4444;
+    --legend-x: #3b82f6;
+    --legend-y: #f59e0b;
+
+    /* Hit-Slop Margin */
+    --hit-slop: 12px;
+}
+
+/* 1. Global Reset & Hardened Mobile Gesture Locks */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: none !important;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
+    overflow: hidden;
+    position: fixed;
+    background-color: var(--hw-black-dark);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    overscroll-behavior: none;
+}
+
+/* 2. Main Hardware Controller Shell (Matte Carbon Radial Gradient) */
+.controller-shell {
+    display: flex;
+    flex-direction: row;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    position: relative;
+    justify-content: space-between;
+    align-items: stretch;
+    background: radial-gradient(circle at 50% 40%, var(--hw-black-light) 0%, var(--hw-black-base) 65%, var(--hw-black-dark) 100%);
+    padding-top: max(4px, env(safe-area-inset-top));
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+}
+
+/* Hardware Seam Dividers (Molded polymer panel separation lines) */
+.hardware-seam {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(180deg, 
+        transparent 0%, 
+        var(--hw-seam-dark) 15%, 
+        var(--hw-seam-dark) 85%, 
+        transparent 100%
+    );
+    box-shadow: 1px 0 0 var(--hw-seam-light);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.seam-left {
+    right: 0;
+}
+
+.seam-right {
+    left: 0;
+}
+
+/* 3. Top Hardware Notch Status Island */
+.hardware-notch {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: flex;
+    justify-content: center;
+}
+
+.notch-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(180deg, #11141c 0%, #090b0e 100%);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    padding: 4px 16px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.8), inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.notch-label.player-pill {
+    background: var(--hw-surface-raised);
+    color: var(--accent-yellow);
+    border: 1px solid rgba(250, 204, 21, 0.3);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.notch-sep {
+    color: var(--text-dark);
+    font-size: 9px;
+}
+
+.status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: var(--text-dark);
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.status-badge.connected .status-dot {
+    background-color: var(--status-green);
+    box-shadow: 0 0 8px var(--status-green);
+}
+
+.status-badge.connecting .status-dot {
+    background-color: var(--status-amber);
+    box-shadow: 0 0 8px var(--status-amber);
+}
+
+.status-badge.disconnected .status-dot,
+.status-badge.reconnecting .status-dot {
+    background-color: var(--status-red);
+    box-shadow: 0 0 8px var(--status-red);
+}
+
+/* STALE state — amber pulse when watchdog fires */
+.status-badge.stale .status-dot {
+    background-color: var(--status-amber);
+    box-shadow: 0 0 8px var(--status-amber);
+    animation: stale-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes stale-pulse {
+    from { opacity: 1; }
+    to   { opacity: 0.4; }
+}
+
+.latency-value {
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+}
+
+.driver-tag {
+    color: #cbd5e1;
+    font-size: 10px;
+}
+
+/* 4. Controller Functional Zones */
+.controller-zone {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    z-index: 2;
+}
+
+.grip-left {
+    width: 37%;
+    align-items: flex-start;
+}
+
+.console-center {
+    width: 26%;
+    align-items: center;
+    justify-content: center;
+    padding-top: 36px;
+}
+
+.grip-right {
+    width: 37%;
+    align-items: flex-end;
+}
+
+/* 5. Ergonomic Sculpted Shoulder Triggers (Paddles) */
+.shoulder-cluster {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+}
+
+.left-shoulder {
+    justify-content: flex-start;
+}
+
+.right-shoulder {
+    justify-content: flex-end;
+}
+
+.trigger-paddle, .bumper-paddle {
+    position: relative;
+    background: linear-gradient(180deg, #272d3b 0%, #171b24 100%);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 8px 12px 6px 8px;
+    padding: 10px 22px;
+    color: #e2e8f0;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14),
+                inset 0 -2px 0 rgba(0, 0, 0, 0.6),
+                0 4px 8px rgba(0, 0, 0, 0.5);
+    transition: transform 0.05s ease, box-shadow 0.05s ease, border-color 0.05s ease;
+    cursor: pointer;
+    min-width: 68px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.trigger-paddle {
+    min-width: 78px;
+    background: linear-gradient(180deg, #2e3546 0%, #1b1f2a 100%);
+}
+
+.trigger-lt {
+    border-top-left-radius: 14px;
+}
+
+.trigger-rt {
+    border-top-right-radius: 14px;
+}
+
+/* Expanded Hit-Slop Pseudo Elements */
+.trigger-paddle::after, .bumper-paddle::after {
+    content: '';
+    position: absolute;
+    top: calc(-1 * var(--hit-slop));
+    bottom: calc(-1 * var(--hit-slop));
+    left: calc(-1 * var(--hit-slop));
+    right: calc(-1 * var(--hit-slop));
+}
+
+/* Active Press State: Tactile Compression + Electric Yellow Accent Glow */
+.trigger-paddle.active, .bumper-paddle.active {
+    transform: scale(0.94) translateY(2px) !important;
+    border-color: var(--accent-yellow) !important;
+    box-shadow: 0 0 16px var(--accent-yellow-glow),
+                0 0 28px var(--accent-yellow-dim),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2),
+                inset 0 -1px 2px rgba(0, 0, 0, 0.8) !important;
+}
+
+.trigger-paddle.active .paddle-label, .bumper-paddle.active .paddle-label {
+    color: var(--accent-yellow);
+    text-shadow: 0 0 8px rgba(250, 204, 21, 0.7);
+}
+
+/* 6. Lower Grip Primary Controls (Sticks, D-Pad, Diamond) */
+.grip-controls {
+    display: flex;
+    width: 100%;
+    justify-content: space-around;
+    align-items: center;
+    padding-bottom: 8px;
+}
+
+/* Recessed Thumbstick Sockets with Degree-Tick Bezel */
+.thumbstick-housing {
+    position: relative;
+    width: 132px;
+    height: 132px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Degree Bezel Ring */
+.bezel-ticks {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: repeating-conic-gradient(
+        from 0deg,
+        rgba(255, 255, 255, 0.15) 0deg 1deg,
+        transparent 1deg 30deg
+    );
+    -webkit-mask: radial-gradient(circle, transparent 58px, #000 59px, #000 66px, transparent 67px);
+    mask: radial-gradient(circle, transparent 58px, #000 59px, #000 66px, transparent 67px);
+    pointer-events: none;
+}
+
+/* Deep Circular Recessed Well */
+.stick-well {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%, #07090c 0%, #10131a 70%, #171c26 100%);
+    box-shadow: inset 0 4px 14px rgba(0, 0, 0, 0.85),
+                inset 0 -1px 1px rgba(255, 255, 255, 0.08),
+                0 2px 6px rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Floating Thumbcap with Concave Grip Texture */
+.stick-nub {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #2a303f 0%, #181d26 70%, #11141b 100%);
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18),
+                0 4px 12px rgba(0, 0, 0, 0.7);
+    pointer-events: none;
+    transform: translate3d(0, 0, 0);
+    transition: transform 0.04s ease-out, border-color 0.1s ease, box-shadow 0.1s ease;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.stick-concave-cap {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%, #12151d 0%, #1f2532 80%, #151922 100%);
+    box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.85),
+                inset 0 -1px 2px rgba(255, 255, 255, 0.08);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+/* Concave knurled ridges */
+.stick-grip-ridges {
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px dashed rgba(255, 255, 255, 0.12);
+    pointer-events: none;
+}
+
+.stick-accent-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.12);
+    transition: background-color 0.1s ease, box-shadow 0.1s ease;
+}
+
+/* Active Thumbstick State: Dynamic Electric-Yellow Glowing Accent Ring */
+.stick-well.active .stick-nub {
+    border-color: var(--accent-yellow) !important;
+    box-shadow: 0 0 16px var(--accent-yellow-glow),
+                0 0 28px var(--accent-yellow-dim),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+}
+
+.stick-well.active .stick-accent-dot {
+    background-color: var(--accent-yellow);
+    box-shadow: 0 0 8px var(--accent-yellow);
+}
+
+/* 7. Tactile 3D Directional Cross Pad (D-Pad) */
+.dpad-housing {
+    position: relative;
+    width: 122px;
+    height: 122px;
+}
+
+.dpad-cross-base {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 114px;
+    height: 114px;
+    pointer-events: none;
+}
+
+.dpad-btn {
+    position: absolute;
+    width: 38px;
+    height: 38px;
+    background: linear-gradient(180deg, #222733 0%, #141720 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12),
+                inset 0 -2px 0 rgba(0, 0, 0, 0.6),
+                0 3px 6px rgba(0, 0, 0, 0.4);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    cursor: pointer;
+    transition: transform 0.05s ease, box-shadow 0.05s ease, border-color 0.05s ease;
+}
+
+.dpad-btn::after {
+    content: '';
+    position: absolute;
+    top: calc(-1 * var(--hit-slop));
+    bottom: calc(-1 * var(--hit-slop));
+    left: calc(-1 * var(--hit-slop));
+    right: calc(-1 * var(--hit-slop));
+}
+
+.dpad-up {
+    top: 0;
+    left: 42px;
+    border-radius: 8px 8px 0 0;
+}
+
+.dpad-down {
+    bottom: 0;
+    left: 42px;
+    border-radius: 0 0 8px 8px;
+}
+
+.dpad-left {
+    top: 42px;
+    left: 0;
+    border-radius: 8px 0 0 8px;
+}
+
+.dpad-right {
+    top: 42px;
+    right: 0;
+    border-radius: 0 8px 8px 0;
+}
+
+.dpad-center-well {
+    position: absolute;
+    top: 42px;
+    left: 42px;
+    width: 38px;
+    height: 38px;
+    background: #141720;
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.7);
+    pointer-events: none;
+}
+
+.dpad-btn.active {
+    transform: scale(0.94) translateY(2px) !important;
+    background: #252b39;
+    border-color: var(--accent-yellow) !important;
+    box-shadow: 0 0 16px var(--accent-yellow-glow),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+    color: var(--accent-yellow) !important;
+}
+
+/* 8. 3D Tactile ABXY Diamond with Colored Inner Rings & Electric-Yellow Glow */
+.action-diamond-housing {
+    position: relative;
+    width: 132px;
+    height: 132px;
+}
+
+.diamond-backing-plate {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.03) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.face-btn {
+    position: absolute;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: linear-gradient(180deg, #272d3a 0%, #161922 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16),
+                inset 0 -2px 3px rgba(0, 0, 0, 0.65),
+                0 4px 10px rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.05s ease, box-shadow 0.05s ease, border-color 0.05s ease;
+}
+
+/* Expanded Hit-Slop Area */
+.face-btn::after {
+    content: '';
+    position: absolute;
+    top: calc(-1 * var(--hit-slop));
+    bottom: calc(-1 * var(--hit-slop));
+    left: calc(-1 * var(--hit-slop));
+    right: calc(-1 * var(--hit-slop));
+}
+
+/* Subtle Colored Inner Rings */
+.btn-inner-ring {
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    pointer-events: none;
+    transition: border-color 0.1s ease, box-shadow 0.1s ease;
+}
+
+.btn-legend {
+    font-size: 19px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    position: relative;
+    z-index: 2;
+    transition: color 0.05s ease, text-shadow 0.05s ease;
+}
+
+/* Diamond Button Layout Coordinates */
+.btn-y {
+    top: 0;
+    left: 44px;
+}
+.btn-y .btn-inner-ring {
+    border-color: rgba(245, 158, 11, 0.4);
+}
+.btn-y .btn-legend {
+    color: #fbbf24;
+}
+
+.btn-x {
+    top: 44px;
+    left: 0;
+}
+.btn-x .btn-inner-ring {
+    border-color: rgba(59, 130, 246, 0.4);
+}
+.btn-x .btn-legend {
+    color: #60a5fa;
+}
+
+.btn-b {
+    top: 44px;
+    right: 0;
+}
+.btn-b .btn-inner-ring {
+    border-color: rgba(239, 68, 68, 0.4);
+}
+.btn-b .btn-legend {
+    color: #f87171;
+}
+
+.btn-a {
+    bottom: 0;
+    left: 44px;
+}
+.btn-a .btn-inner-ring {
+    border-color: rgba(16, 185, 129, 0.4);
+}
+.btn-a .btn-legend {
+    color: #34d399;
+}
+
+/* High-Contrast Electric-Yellow (#FACC15) Outer Neon Glow on Active Press */
+.face-btn.active {
+    transform: scale(0.94) translateY(2px) !important;
+    border-color: var(--accent-yellow) !important;
+    background: linear-gradient(180deg, #323a4b 0%, #1d222e 100%) !important;
+    box-shadow: 0 0 18px var(--accent-yellow-glow),
+                0 0 32px var(--accent-yellow-dim),
+                inset 0 1px 0 rgba(255, 255, 255, 0.25),
+                inset 0 0 8px rgba(250, 204, 21, 0.3) !important;
+}
+
+.face-btn.active .btn-legend {
+    color: var(--accent-yellow) !important;
+    text-shadow: 0 0 10px var(--accent-yellow-glow) !important;
+}
+
+.face-btn.active .btn-inner-ring {
+    border-color: var(--accent-yellow) !important;
+    box-shadow: 0 0 8px var(--accent-yellow-glow) !important;
+}
+
+/* 9. Center Console Panel (Back, Xbox Guide Jewel, Start, Fullscreen) */
+.center-console-panel {
+    background: linear-gradient(180deg, rgba(22, 26, 35, 0.9) 0%, rgba(13, 16, 22, 0.95) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    padding: 12px 18px 10px 18px;
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.6),
+                0 6px 18px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 90%;
+    max-width: 250px;
+    position: relative;
+}
+
+.console-screws {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0 4px;
+}
+
+.screw-head {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #11141c;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+.console-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.console-btn {
+    background: linear-gradient(180deg, #222733 0%, #151821 100%);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 14px;
+    padding: 6px 10px;
+    color: var(--text-dim);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                0 2px 5px rgba(0, 0, 0, 0.4);
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.05s ease, box-shadow 0.05s ease;
+}
+
+.console-btn::after {
+    content: '';
+    position: absolute;
+    top: calc(-1 * var(--hit-slop));
+    bottom: calc(-1 * var(--hit-slop));
+    left: calc(-1 * var(--hit-slop));
+    right: calc(-1 * var(--hit-slop));
+}
+
+.console-btn.active {
+    transform: scale(0.94) translateY(1px) !important;
+    border-color: var(--accent-yellow) !important;
+    box-shadow: 0 0 12px var(--accent-yellow-glow) !important;
+    color: var(--accent-yellow) !important;
+}
+
+/* Center Xbox Guide Button with Metallic Jewel Accent */
+.guide-jewel {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #2b3140 0%, #141720 100%);
+    border: 2px solid #3c4456;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.25),
+                0 4px 12px rgba(0, 0, 0, 0.7);
+    position: relative;
+    transition: transform 0.05s ease, box-shadow 0.05s ease, border-color 0.05s ease;
+}
+
+.guide-jewel::after {
+    content: '';
+    position: absolute;
+    top: calc(-1 * var(--hit-slop));
+    bottom: calc(-1 * var(--hit-slop));
+    left: calc(-1 * var(--hit-slop));
+    right: calc(-1 * var(--hit-slop));
+}
+
+.jewel-outer-ring {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 40%, #1f2533 0%, #0d0f15 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9);
+}
+
+.jewel-core {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: linear-gradient(180deg, #3a4254 0%, #1a1e27 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.jewel-x-glyph {
+    color: #94a3b8;
+    font-size: 15px;
+    font-weight: 900;
+    letter-spacing: -1px;
+}
+
+.guide-jewel.active {
+    transform: scale(0.94) translateY(2px) !important;
+    border-color: var(--accent-yellow) !important;
+    box-shadow: 0 0 22px var(--accent-yellow-glow),
+                0 0 35px var(--accent-yellow-dim) !important;
+}
+
+.guide-jewel.active .jewel-x-glyph {
+    color: var(--accent-yellow) !important;
+    text-shadow: 0 0 8px var(--accent-yellow) !important;
+}
+
+/* Fullscreen Pill Button */
+.console-footer {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+.fullscreen-pill {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 12px;
+    padding: 3px 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-dim);
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.fullscreen-pill:hover, .fullscreen-pill:active {
+    background: rgba(250, 204, 21, 0.1);
+    color: var(--accent-yellow);
+    border-color: rgba(250, 204, 21, 0.3);
+}
+
+/* 10. Portrait Mode Warning Screen */
+.portrait-warning {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    background: var(--hw-black-dark);
+    z-index: 9999;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    text-align: center;
+    padding: 24px;
+}
+
+.rotate-device-glyph {
+    position: relative;
+    font-size: 42px;
+    margin-bottom: 8px;
+    animation: rotate-anim 2.5s infinite ease-in-out;
+}
+
+@keyframes rotate-anim {
+    0%, 15% { transform: rotate(0deg); }
+    50%, 65% { transform: rotate(-90deg); }
+    100% { transform: rotate(0deg); }
+}
+
+.portrait-warning h2 {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: var(--accent-yellow);
+}
+
+.portrait-warning p {
+    font-size: 13px;
+    color: var(--text-dim);
+    max-width: 280px;
+    line-height: 1.4;
+}
+
+@media (orientation: portrait) {
+    .portrait-warning {
+        display: flex;
+    }
+}
