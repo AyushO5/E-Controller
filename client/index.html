@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Gamepad">
-    <meta name="theme-color" content="#0b0d10">
+    <meta name="theme-color" content="#0D0F12">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="manifest.json">
     
@@ -43,9 +43,9 @@
             </div>
         </header>
 
-        <!-- Left Grip Zone (LT/LB Paddles, Bezeled Stick Well, Tactile D-Pad) -->
+        <!-- Left Grip Zone (LT/LB Stacked Paddles, Bezeled Stick Well, Tactile D-Pad) -->
         <section class="controller-zone grip-left">
-            <!-- Sculpted Left Shoulder Triggers -->
+            <!-- Vertically Stacked Left Shoulder Triggers (LT on top, LB below) -->
             <div class="shoulder-cluster left-shoulder">
                 <button class="trigger-paddle trigger-lt" id="trigger-lt" aria-label="Left Trigger">
                     <span class="paddle-label">LT</span>
@@ -138,37 +138,24 @@
             </div>
         </section>
 
-        <!-- Right Grip Zone (RT/RB Paddles, Tactile ABXY Diamond, Right Stick Well) -->
+        <!-- Right Grip Zone (RT/RB Stacked Paddles, Tactile ABXY Diamond, Right Stick Well) -->
         <section class="controller-zone grip-right">
             <div class="hardware-seam seam-right"></div>
 
-            <!-- Sculpted Right Shoulder Triggers -->
+            <!-- Vertically Stacked Right Shoulder Triggers (RT on top, RB below) -->
             <div class="shoulder-cluster right-shoulder">
-                <button class="bumper-paddle bumper-rb" id="btn-rb" data-button="RB" aria-label="Right Bumper">
-                    <span class="paddle-label">RB</span>
-                    <span class="paddle-specular"></span>
-                </button>
                 <button class="trigger-paddle trigger-rt" id="trigger-rt" aria-label="Right Trigger">
                     <span class="paddle-label">RT</span>
+                    <span class="paddle-specular"></span>
+                </button>
+                <button class="bumper-paddle bumper-rb" id="btn-rb" data-button="RB" aria-label="Right Bumper">
+                    <span class="paddle-label">RB</span>
                     <span class="paddle-specular"></span>
                 </button>
             </div>
 
             <!-- Right Primary Controls -->
             <div class="grip-controls right-controls">
-                <!-- Recessed Right Thumbstick Well with Degree Bezel -->
-                <div class="thumbstick-housing" aria-label="Right Thumbstick">
-                    <div class="bezel-ticks"></div>
-                    <div class="stick-well" id="right-stick-zone">
-                        <div class="stick-nub" id="right-stick-nub">
-                            <div class="stick-concave-cap">
-                                <div class="stick-grip-ridges"></div>
-                                <div class="stick-accent-dot"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- 3D Tactile ABXY Diamond with Colored Inner Rings & Yellow Outer Glow -->
                 <div class="action-diamond-housing" id="action-diamond" aria-label="Action Buttons">
                     <div class="diamond-backing-plate"></div>
@@ -188,6 +175,19 @@
                         <span class="btn-inner-ring"></span>
                         <span class="btn-legend">A</span>
                     </button>
+                </div>
+
+                <!-- Recessed Right Thumbstick Well with Degree Bezel -->
+                <div class="thumbstick-housing" aria-label="Right Thumbstick">
+                    <div class="bezel-ticks"></div>
+                    <div class="stick-well" id="right-stick-zone">
+                        <div class="stick-nub" id="right-stick-nub">
+                            <div class="stick-concave-cap">
+                                <div class="stick-grip-ridges"></div>
+                                <div class="stick-accent-dot"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
