@@ -1,8 +1,7 @@
 /* ==========================================================================
-   Virtual Gamepad — Carbon & Volt Ergonomic Handheld Controller UI
-   Inspired by Backbone One & Xbox Elite Controller
-   Theme: Matte Obsidian (#0A0C10) · Restrained Electric Yellow (#FACC15)
-   Lowered Natural Thumb-Arc Placement: Primary @ 60% dvh · Secondary @ Bottom Inner
+   Virtual Gamepad — Ergonomic Handheld Controller UI
+   Theme: Matte Obsidian (#0A0C10 / #151922) · Electric Yellow (#FACC15)
+   Architecture: 3-Column Grid (1.35fr 0.85fr 1.35fr) with Yellow Hardware Accents
    ========================================================================== */
 
 /* ── Design Tokens ──────────────────────────────────────────────────────── */
@@ -10,21 +9,22 @@
     /* Chassis & Surfaces */
     --chassis-bg:        #0A0C10;
     --deck-bg:           #101319;
-    --control-surface:   #161B24;
-    --control-surface-hi:#1D2330;
-    --control-surface-lo:#0E1117;
+    --control-surface:   #151922;
+    --control-surface-hi:#1C2230;
+    --control-surface-lo:#0D1017;
 
     /* Hardware Borders & Highlights */
+    --border-control:    rgba(255, 255, 255, 0.09);
+    --border-control-hi: rgba(255, 255, 255, 0.14);
     --border-deck:       rgba(255, 255, 255, 0.06);
-    --border-control:    rgba(255, 255, 255, 0.08);
-    --border-control-hi: rgba(255, 255, 255, 0.12);
-    --inner-specular:    rgba(255, 255, 255, 0.08);
+    --inner-specular:    rgba(255, 255, 255, 0.10);
 
-    /* Electric Yellow Volt Accent (Active Only) */
+    /* Electric Yellow Volt Accent (Active & Hardware Highlights) */
     --volt-yellow:       #FACC15;
     --volt-glow:         rgba(250, 204, 21, 0.55);
-    --volt-fill:         rgba(250, 204, 21, 0.16);
+    --volt-fill:         rgba(250, 204, 21, 0.18);
     --volt-dim:          rgba(250, 204, 21, 0.25);
+    --grid-divider:      rgba(250, 204, 21, 0.25);
 
     /* Typography & Glyphs */
     --text-white:        #F3F4F6;
@@ -36,18 +36,23 @@
     --status-amber:      #F59E0B;
     --status-red:        #EF4444;
 
-    /* Responsive Scale Clamps */
-    --stick-socket:      clamp(100px, 14vw, 120px);
-    --stick-cap:         clamp(50px, 7vw, 60px);
-    --dpad-dim:          clamp(112px, 15vw, 128px);
-    --dpad-arm-dim:      clamp(38px, 5.2vw, 44px);
-    --diamond-dim:       clamp(144px, 19.5vw, 168px);
-    --face-btn-dim:      clamp(44px, 6vw, 52px);
-    --trigger-w:         clamp(100px, 14vw, 124px);
-    --bumper-w:          clamp(88px, 12vw, 108px);
+    /* Component Scale Clamps */
+    --trigger-w:         clamp(148px, 18vw, 182px);
+    --trigger-h:         clamp(44px, 10.5vh, 52px);
+    --bumper-w:          clamp(136px, 16.5vw, 168px);
+    --bumper-h:          clamp(38px, 9vh, 46px);
+    --stick-socket:      clamp(124px, 29vh, 142px);
+    --stick-cap:         clamp(62px, 14.5vh, 72px);
+    --dpad-dish:         clamp(124px, 29vh, 142px);
+    --dpad-arm:          clamp(38px, 9vh, 44px);
+    --guide-dim:         clamp(54px, 13vh, 66px);
+    --sys-btn-dim:       clamp(42px, 10vh, 48px);
+    --diamond-dim:       clamp(182px, 43vh, 206px);
+    --face-btn-dim:      clamp(54px, 13vh, 64px);
+    --face-btn-label:    clamp(18px, 4.2vh, 22px);
 }
 
-/* ── 1. Global Reset & Mobile Gesture Locks ─────────────────────────────── */
+/* ── 1. Global Reset & Universal Touch Hardening ────────────────────────── */
 *, *::before, *::after {
     box-sizing: border-box;
     margin: 0;
@@ -62,6 +67,7 @@
 html, body {
     width: 100%;
     height: 100%;
+    width: 100dvw;
     height: 100dvh;
     overflow: hidden;
     position: fixed;
@@ -69,9 +75,39 @@ html, body {
     color: var(--text-white);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     overscroll-behavior: none;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
 }
 
-/* ── 2. Unified Hardware Chassis ────────────────────────────────────────── */
+/* Explicit Anti-Stick Touch Lock on Interactive Elements */
+html,
+body,
+.controller-shell,
+#controller-shell,
+.trigger-paddle,
+.bumper-paddle,
+.console-btn,
+.guide-jewel,
+.fullscreen-pill,
+.thumbstick-housing,
+.stick-well,
+.stick-nub,
+.stick-concave-cap,
+.dpad-housing,
+.dpad-btn,
+.action-diamond-housing,
+.face-btn,
+[data-button] {
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    overscroll-behavior: none;
+}
+
+/* ── 2. Unified Hardware Chassis & 3-Column CSS Grid ────────────────────── */
 .controller-shell {
     position: relative;
     width: 100vw;
@@ -79,85 +115,106 @@ html, body {
     height: 100vh;
     height: 100dvh;
     overflow: hidden;
-    background: radial-gradient(ellipse at 50% 35%, #131722 0%, var(--chassis-bg) 65%, #050608 100%);
+    background: radial-gradient(ellipse at 50% 30%, #151922 0%, var(--chassis-bg) 65%, #050608 100%);
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
-/* ── 3. Sculpted Controller Decks & Hardware Bridge ─────────────────────── */
-.deck-surface {
+/* Crisp horizontal #FACC15 yellow accent strips along top edge above trigger zones */
+.hw-accent-strip {
     position: absolute;
-    top: max(8px, env(safe-area-inset-top));
-    bottom: max(8px, env(safe-area-inset-bottom));
-    width: clamp(260px, 38vw, 360px);
-    background: linear-gradient(180deg, #12151D 0%, var(--deck-bg) 100%);
-    border: 1px solid var(--border-deck);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06),
-                inset 0 -2px 0 rgba(0, 0, 0, 0.7),
-                0 8px 32px rgba(0, 0, 0, 0.6);
+    top: max(0px, env(safe-area-inset-top));
+    height: 3px;
+    background-color: var(--volt-yellow);
+    box-shadow: 0 2px 10px rgba(250, 204, 21, 0.45);
+    z-index: 100;
     pointer-events: none;
-    z-index: 1;
 }
 
-.deck-left {
-    left: max(8px, env(safe-area-inset-left));
-    border-radius: 28px 20px 24px 32px;
+.accent-left {
+    left: max(12px, env(safe-area-inset-left));
+    width: var(--trigger-w);
+    border-radius: 0 0 2px 2px;
 }
 
-.deck-right {
-    right: max(8px, env(safe-area-inset-right));
-    border-radius: 20px 28px 32px 24px;
+.accent-right {
+    right: max(12px, env(safe-area-inset-right));
+    width: var(--trigger-w);
+    border-radius: 0 0 2px 2px;
 }
 
-.deck-bridge {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: clamp(200px, 28vw, 280px);
-    height: 52px;
-    background: linear-gradient(180deg, #141822 0%, var(--chassis-bg) 100%);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 0 0 16px 16px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
-    pointer-events: none;
-    z-index: 1;
+/* 3-Column Controller Grid (1.35fr 0.85fr 1.35fr) */
+.controller-grid {
+    display: grid;
+    grid-template-columns: 1.35fr 0.85fr 1.35fr;
+    width: 100%;
+    height: 100%;
+    position: relative;
 }
 
-/* ── 4. Compact Shoulder Paddles (Top Corners Only) ─────────────────────── */
+.controller-col {
+    position: relative;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* Subtle vertical dashed dividers between Left/Center and Center/Right */
+.col-left {
+    border-right: 1px dashed var(--grid-divider);
+}
+
+.col-right {
+    border-left: 1px dashed var(--grid-divider);
+}
+
+/* ── 3. Swept Wing Triggers & Wide Bumpers (Top Corners) ─────────────────── */
 .shoulder-cluster {
     position: absolute;
     top: max(10px, env(safe-area-inset-top));
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    z-index: 10;
+    gap: 10px;
+    z-index: 20;
 }
 
 .left-shoulder {
-    left: max(16px, env(safe-area-inset-left));
+    left: max(12px, env(safe-area-inset-left));
     align-items: flex-start;
 }
 
 .right-shoulder {
-    right: max(16px, env(safe-area-inset-right));
+    right: max(12px, env(safe-area-inset-right));
     align-items: flex-end;
 }
 
-.trigger-paddle, .bumper-paddle {
+/* Swept Wing Trigger (LT & RT) */
+.trigger-paddle {
     position: relative;
-    background: var(--control-surface);
-    border: 1px solid var(--border-control);
+    width: var(--trigger-w);
+    height: var(--trigger-h);
+    background: linear-gradient(180deg, var(--control-surface-hi) 0%, var(--control-surface) 100%);
+    border: 1px solid var(--border-control-hi);
     color: var(--text-white);
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 1px;
     box-shadow: inset 0 1px 0 var(--inner-specular),
                 inset 0 -2px 0 rgba(0, 0, 0, 0.6),
-                0 3px 8px rgba(0, 0, 0, 0.5);
+                0 4px 12px rgba(0, 0, 0, 0.55);
     display: flex;
     justify-content: center;
     align-items: center;
     cursor: pointer;
-    transition: transform 0.05s ease, box-shadow 0.05s ease, border-color 0.05s ease, background-color 0.05s ease;
+    transition: transform 0.05s ease, box-shadow 0.05s ease, border-color 0.05s ease, background 0.05s ease;
+}
+
+/* Asymmetric flare: LT flares upward at outer-left corner with curved tapered lower edge */
+.trigger-lt {
+    border-radius: 22px 6px 8px 18px;
+}
+
+/* Asymmetric flare: RT flares upward at outer-right corner with curved tapered lower edge */
+.trigger-rt {
+    border-radius: 6px 22px 18px 8px;
 }
 
 .trigger-paddle::after, .bumper-paddle::after {
@@ -166,38 +223,46 @@ html, body {
     top: -6px; bottom: -6px; left: -6px; right: -6px;
 }
 
-.trigger-paddle {
-    width: var(--trigger-w);
-    height: 36px;
-    border-radius: 12px 12px 5px 5px;
-    background: linear-gradient(180deg, var(--control-surface-hi) 0%, var(--control-surface) 100%);
-    border-color: var(--border-control-hi);
-}
-
+/* Wide Rounded-Rectangle Bumpers (LB & RB) */
 .bumper-paddle {
+    position: relative;
     width: var(--bumper-w);
-    height: 30px;
-    border-radius: 5px 5px 10px 10px;
+    height: var(--bumper-h);
+    border-radius: 8px 8px 14px 14px;
     background: var(--control-surface);
+    border: 1px solid var(--border-control);
+    color: var(--text-white);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    box-shadow: inset 0 1px 0 var(--inner-specular),
+                inset 0 -2px 0 rgba(0, 0, 0, 0.55),
+                0 3px 8px rgba(0, 0, 0, 0.45);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.05s ease, box-shadow 0.05s ease, border-color 0.05s ease, background 0.05s ease;
 }
 
-/* Active Volt / Yellow Press State */
+/* Active Electric Yellow State for Triggers & Bumpers */
 .trigger-paddle.active, .bumper-paddle.active {
-    transform: scale(0.95) translateY(1px) !important;
+    transform: scale(0.96) translateY(1px) !important;
     border-color: var(--volt-yellow) !important;
     background: var(--volt-fill) !important;
     box-shadow: 0 0 16px var(--volt-glow),
-                inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+                inset 0 0 8px rgba(250, 204, 21, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
 }
 
 .trigger-paddle.active .paddle-label,
 .bumper-paddle.active .paddle-label {
-    color: var(--volt-yellow);
-    text-shadow: 0 0 6px var(--volt-glow);
+    color: var(--volt-yellow) !important;
+    text-shadow: 0 0 8px var(--volt-glow) !important;
 }
 
-/* ── 5. Top-Center Telemetry & System Row ────────────────────────────────── */
-.center-console {
+/* ── 4. Center Column — Guide Sphere & Inverted Triangle Cluster ─────────── */
+.center-top-cluster {
     position: absolute;
     top: max(8px, env(safe-area-inset-top));
     left: 50%;
@@ -205,26 +270,93 @@ html, body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 12px;
-    z-index: 20;
+    gap: 8px;
+    z-index: 25;
 }
 
-/* Top Telemetry Status Bar */
+/* Prominent Circular Xbox Guide Sphere */
+.guide-jewel {
+    width: var(--guide-dim);
+    height: var(--guide-dim);
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #252D3D 0%, #151922 65%, #0B0E14 100%);
+    border: 2px solid var(--border-control-hi);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: inset 0 2px 2px rgba(255, 255, 255, 0.15),
+                inset 0 -3px 6px rgba(0, 0, 0, 0.8),
+                0 4px 12px rgba(0, 0, 0, 0.65);
+    position: relative;
+    transition: transform 0.05s ease, box-shadow 0.05s ease, border-color 0.05s ease;
+}
+
+.guide-jewel::after {
+    content: '';
+    position: absolute;
+    top: -8px; bottom: -8px; left: -8px; right: -8px;
+    border-radius: 50%;
+}
+
+.jewel-outer-ring {
+    width: 82%;
+    height: 82%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 40%, #1A1F2C 0%, #0A0C10 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.jewel-core {
+    width: 66%;
+    height: 66%;
+    border-radius: 50%;
+    background: linear-gradient(180deg, #2E3648 0%, #161922 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.jewel-x-glyph {
+    color: var(--text-slate);
+    font-size: 15px;
+    font-weight: 900;
+    transition: color 0.1s ease, text-shadow 0.1s ease;
+}
+
+.guide-jewel.active {
+    transform: scale(0.95) translateY(1px) !important;
+    border-color: var(--volt-yellow) !important;
+    background: var(--volt-fill) !important;
+    box-shadow: 0 0 20px var(--volt-glow),
+                inset 0 0 8px rgba(250, 204, 21, 0.3) !important;
+}
+
+.guide-jewel.active .jewel-x-glyph {
+    color: var(--volt-yellow) !important;
+    text-shadow: 0 0 8px var(--volt-yellow) !important;
+}
+
+/* Compact Telemetry Status Pill (8px directly below Guide) */
 .notch-pill {
     display: flex;
     align-items: center;
-    gap: 7px;
-    background: linear-gradient(180deg, #12151C 0%, #080A0E 100%);
+    gap: 6px;
+    background: linear-gradient(180deg, #131720 0%, #090B0F 100%);
     border: 1px solid var(--border-control);
-    border-radius: 10px;
-    padding: 3px 10px;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.6),
+    border-radius: 8px;
+    padding: 2px 9px;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6),
                 inset 0 1px 0 rgba(255, 255, 255, 0.06);
     font-size: 10px;
     font-weight: 600;
     letter-spacing: 0.3px;
     white-space: nowrap;
-    height: 26px;
+    height: 24px;
 }
 
 .notch-label.player-pill {
@@ -294,166 +426,126 @@ html, body {
     font-size: 9px;
 }
 
-/* Crisp icon-only fullscreen toggle button inside status pill */
-.fullscreen-pill {
-    background: transparent;
-    border: none;
-    color: var(--text-slate);
-    cursor: pointer;
+/* Inverted-Triangle System Buttons (Middle Band top: 52%) */
+.inverted-triangle-cluster {
+    position: absolute;
+    top: 52%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    z-index: 20;
+}
+
+.triangle-top-row {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0 2px 0 4px;
-    margin-left: 2px;
-    border-left: 1px solid rgba(255, 255, 255, 0.08);
-    height: 14px;
-    transition: color 0.15s ease;
+    gap: 28px;
 }
 
-.fullscreen-pill:hover, .fullscreen-pill:active {
-    color: var(--volt-yellow);
-}
-
-.fs-glyph {
-    font-size: 11px;
-}
-
-/* System Row (12px gap directly beneath status pill) */
-.console-actions {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 14px;
-}
-
+/* Circular View & Menu Buttons */
 .console-btn {
-    width: 70px;
-    height: 30px;
+    width: var(--sys-btn-dim);
+    height: var(--sys-btn-dim);
+    border-radius: 50%;
     background: var(--control-surface);
     border: 1px solid var(--border-control);
-    border-radius: 8px;
     color: var(--text-slate);
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 3px;
     box-shadow: inset 0 1px 0 var(--inner-specular),
-                0 2px 5px rgba(0, 0, 0, 0.35);
+                inset 0 -2px 0 rgba(0, 0, 0, 0.5),
+                0 3px 8px rgba(0, 0, 0, 0.45);
     cursor: pointer;
     position: relative;
-    transition: transform 0.05s ease, box-shadow 0.05s ease, background-color 0.05s ease;
+    transition: transform 0.05s ease, box-shadow 0.05s ease, background 0.05s ease, border-color 0.05s ease, color 0.05s ease;
 }
 
 .console-btn::after {
     content: '';
     position: absolute;
-    top: -6px; bottom: -6px; left: -6px; right: -6px;
+    top: -7px; bottom: -7px; left: -7px; right: -7px;
+    border-radius: 50%;
 }
 
-.console-icon { font-size: 10px; }
-.console-text { font-size: 9px; }
+.console-icon {
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1;
+}
 
 .console-btn.active {
     transform: scale(0.95) translateY(1px) !important;
     border-color: var(--volt-yellow) !important;
     background: var(--volt-fill) !important;
-    box-shadow: 0 0 10px var(--volt-glow) !important;
+    box-shadow: 0 0 14px var(--volt-glow),
+                inset 0 0 6px rgba(250, 204, 21, 0.3) !important;
     color: var(--volt-yellow) !important;
 }
 
-/* Circular Metallic Guide Button (36px × 36px) */
-.guide-jewel {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
+/* Bottom-Center: Rounded-Rectangle Fullscreen Button ([↑]) (12px below View & Menu) */
+.fullscreen-pill.console-btn-fs {
+    width: 64px;
+    height: 34px;
+    border-radius: 10px;
     background: var(--control-surface);
-    border: 1.5px solid var(--border-control-hi);
+    border: 1px solid var(--border-control);
+    color: var(--text-slate);
     display: flex;
-    justify-content: center;
     align-items: center;
+    justify-content: center;
     cursor: pointer;
-    box-shadow: inset 0 1px 0 var(--border-control-hi),
-                0 3px 8px rgba(0, 0, 0, 0.6);
+    box-shadow: inset 0 1px 0 var(--inner-specular),
+                inset 0 -2px 0 rgba(0, 0, 0, 0.5),
+                0 3px 8px rgba(0, 0, 0, 0.4);
     position: relative;
-    transition: transform 0.05s ease, box-shadow 0.05s ease, border-color 0.05s ease;
+    transition: transform 0.05s ease, box-shadow 0.05s ease, background 0.05s ease, border-color 0.05s ease, color 0.05s ease;
 }
 
-.guide-jewel::after {
+.fullscreen-pill.console-btn-fs::after {
     content: '';
     position: absolute;
-    top: -8px; bottom: -8px; left: -8px; right: -8px;
+    top: -6px; bottom: -6px; left: -6px; right: -6px;
+    border-radius: 12px;
 }
 
-.jewel-outer-ring {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 40% 40%, #1A1F2C 0%, #0A0C10 100%);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.8);
+.fs-glyph {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
 }
 
-.jewel-core {
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: linear-gradient(180deg, #2E3545 0%, #161922 100%);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.jewel-x-glyph {
-    color: var(--text-slate);
-    font-size: 11px;
-    font-weight: 900;
-}
-
-.guide-jewel.active {
-    transform: scale(0.95) translateY(1px) !important;
+.fullscreen-pill.console-btn-fs:hover,
+.fullscreen-pill.console-btn-fs.active,
+.fullscreen-pill.console-btn-fs:active {
+    transform: scale(0.96) translateY(1px) !important;
     border-color: var(--volt-yellow) !important;
     background: var(--volt-fill) !important;
-    box-shadow: 0 0 18px var(--volt-glow) !important;
-}
-
-.guide-jewel.active .jewel-x-glyph {
+    box-shadow: 0 0 12px var(--volt-glow) !important;
     color: var(--volt-yellow) !important;
-    text-shadow: 0 0 6px var(--volt-yellow) !important;
 }
 
-/* ── 6. Thumbstick Sockets & Concave Caps ────────────────────────────────── */
-.thumbstick-housing {
+/* ── 5. Left Column — Middle-Outer Stick & Lower-Inner Dish D-Pad ───────── */
+/* Left Stick (left: 28%, top: 54%) */
+.left-stick-housing {
+    position: absolute;
+    left: 28%;
+    top: 54%;
+    transform: translate(-50%, -50%);
     width: var(--stick-socket);
     height: var(--stick-socket);
     display: flex;
     justify-content: center;
     align-items: center;
     flex-shrink: 0;
+    z-index: 15;
 }
 
-/* Left Stick — Lowered Primary Thumb Arc Position */
-.left-stick-housing {
-    position: absolute;
-    left: 11%;
-    top: 60%;
-    transform: translate(-50%, -50%);
-    z-index: 10;
-}
-
-/* Right Stick — Lower-Inner Secondary Arc Position */
-.right-stick-housing {
-    position: absolute;
-    right: 27%;
-    bottom: max(16px, env(safe-area-inset-bottom));
-    transform: translateX(50%);
-    z-index: 10;
-}
-
+/* Common Stick Sockets & Concave Caps */
 .bezel-ticks {
     position: absolute;
     width: 100%;
@@ -494,7 +586,7 @@ html, body {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14),
                 0 3px 10px rgba(0, 0, 0, 0.6);
     pointer-events: none;
-    transform: translate3d(0, 0, 0);
+    transform: translate(0px, 0px);
     transition: transform 0.04s ease-out, border-color 0.1s ease, box-shadow 0.1s ease;
     display: flex;
     justify-content: center;
@@ -533,7 +625,7 @@ html, body {
 
 .stick-well.active .stick-nub {
     border-color: var(--volt-yellow) !important;
-    box-shadow: 0 0 14px var(--volt-glow),
+    box-shadow: 0 0 16px var(--volt-glow),
                 0 0 24px var(--volt-dim),
                 inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
 }
@@ -543,39 +635,55 @@ html, body {
     box-shadow: 0 0 6px var(--volt-yellow);
 }
 
-/* ── 7. D-Pad — Lower-Inner Thumb Arc ───────────────────────────────────── */
+/* Lower-Inner Circular Recessed Dish D-Pad (right: 14px, bottom: 14px) */
 .dpad-housing {
     position: absolute;
-    left: 27%;
-    bottom: max(16px, env(safe-area-inset-bottom));
-    transform: translateX(-50%);
-    width: var(--dpad-dim);
-    height: var(--dpad-dim);
-    z-index: 10;
+    right: 14px;
+    bottom: max(14px, env(safe-area-inset-bottom));
+    width: var(--dpad-dish);
+    height: var(--dpad-dish);
+    border-radius: 50%;
+    background: radial-gradient(circle at 45% 45%, #080A0E 0%, #121620 65%, #181E29 100%);
+    border: 1.5px solid var(--border-control);
+    box-shadow: inset 0 4px 14px rgba(0, 0, 0, 0.9),
+                inset 0 -1px 1px rgba(255, 255, 255, 0.08),
+                0 4px 12px rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 15;
+}
+
+.dpad-dish-rim {
+    position: absolute;
+    inset: 4px;
+    border-radius: 50%;
+    border: 1px dashed rgba(255, 255, 255, 0.05);
+    pointer-events: none;
 }
 
 .dpad-cross-base {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
+    position: relative;
+    width: 86%;
+    height: 86%;
 }
 
 .dpad-btn {
     position: absolute;
-    width: var(--dpad-arm-dim);
-    height: var(--dpad-arm-dim);
+    width: var(--dpad-arm);
+    height: var(--dpad-arm);
     background: var(--control-surface);
     border: 1px solid var(--border-control);
     box-shadow: inset 0 1px 0 var(--inner-specular),
                 inset 0 -2px 0 rgba(0, 0, 0, 0.5),
-                0 2px 5px rgba(0, 0, 0, 0.35);
+                0 2px 6px rgba(0, 0, 0, 0.4);
     display: flex;
     justify-content: center;
     align-items: center;
     color: var(--text-slate);
     font-size: 13px;
     cursor: pointer;
-    transition: transform 0.05s ease, box-shadow 0.05s ease, border-color 0.05s ease, background-color 0.05s ease;
+    transition: transform 0.05s ease, box-shadow 0.05s ease, border-color 0.05s ease, background 0.05s ease;
 }
 
 .dpad-btn::after {
@@ -586,33 +694,37 @@ html, body {
 
 .dpad-up {
     top: 0;
-    left: calc(50% - var(--dpad-arm-dim) / 2);
-    border-radius: 8px 8px 2px 2px;
-}
-.dpad-down {
-    bottom: 0;
-    left: calc(50% - var(--dpad-arm-dim) / 2);
-    border-radius: 2px 2px 8px 8px;
-}
-.dpad-left {
-    top: calc(50% - var(--dpad-arm-dim) / 2);
-    left: 0;
-    border-radius: 8px 2px 2px 8px;
-}
-.dpad-right {
-    top: calc(50% - var(--dpad-arm-dim) / 2);
-    right: 0;
-    border-radius: 2px 8px 8px 2px;
+    left: calc(50% - var(--dpad-arm) / 2);
+    border-radius: 8px 8px 3px 3px;
 }
 
-.dpad-center-well {
+.dpad-down {
+    bottom: 0;
+    left: calc(50% - var(--dpad-arm) / 2);
+    border-radius: 3px 3px 8px 8px;
+}
+
+.dpad-left {
+    top: calc(50% - var(--dpad-arm) / 2);
+    left: 0;
+    border-radius: 8px 3px 3px 8px;
+}
+
+.dpad-right {
+    top: calc(50% - var(--dpad-arm) / 2);
+    right: 0;
+    border-radius: 3px 8px 8px 3px;
+}
+
+/* Inert Center Hub */
+.dpad-center-hub {
     position: absolute;
-    top: calc(50% - var(--dpad-arm-dim) / 2);
-    left: calc(50% - var(--dpad-arm-dim) / 2);
-    width: var(--dpad-arm-dim);
-    height: var(--dpad-arm-dim);
+    top: calc(50% - var(--dpad-arm) / 2);
+    left: calc(50% - var(--dpad-arm) / 2);
+    width: var(--dpad-arm);
+    height: var(--dpad-arm);
     background: #0D1018;
-    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.6);
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.7);
     pointer-events: none;
 }
 
@@ -620,20 +732,21 @@ html, body {
     transform: scale(0.95) translateY(1px) !important;
     border-color: var(--volt-yellow) !important;
     background: var(--volt-fill) !important;
-    box-shadow: 0 0 12px var(--volt-glow),
-                inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+    box-shadow: 0 0 14px var(--volt-glow),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
     color: var(--volt-yellow) !important;
 }
 
-/* ── 8. ABXY Diamond — Lowered Primary Thumb Arc ────────────────────────── */
+/* ── 6. Right Column — Middle-Outer ABXY Diamond & Lower-Inner Right Stick ─ */
+/* Large ABXY Diamond (right: 28%, top: 54%) */
 .action-diamond-housing {
     position: absolute;
-    right: 11%;
-    top: 60%;
+    right: 28%;
+    top: 54%;
     transform: translate(50%, -50%);
     width: var(--diamond-dim);
     height: var(--diamond-dim);
-    z-index: 10;
+    z-index: 15;
 }
 
 .diamond-backing-plate {
@@ -652,13 +765,13 @@ html, body {
     background: var(--control-surface);
     border: 1px solid var(--border-control);
     box-shadow: inset 0 1px 0 var(--inner-specular),
-                inset 0 -2px 3px rgba(0, 0, 0, 0.55),
+                inset 0 -2px 3px rgba(0, 0, 0, 0.6),
                 0 3px 8px rgba(0, 0, 0, 0.5);
     display: flex;
     justify-content: center;
     align-items: center;
     cursor: pointer;
-    transition: transform 0.05s ease, box-shadow 0.05s ease, border-color 0.05s ease, background-color 0.05s ease;
+    transition: transform 0.05s ease, box-shadow 0.05s ease, border-color 0.05s ease, background 0.05s ease;
 }
 
 .face-btn::after {
@@ -679,7 +792,7 @@ html, body {
 }
 
 .btn-legend {
-    font-size: clamp(16px, 4vh, 20px);
+    font-size: var(--face-btn-label);
     font-weight: 800;
     letter-spacing: -0.3px;
     position: relative;
@@ -692,38 +805,41 @@ html, body {
     top: 0;
     left: calc(50% - var(--face-btn-dim) / 2);
 }
+
 .btn-a {
     bottom: 0;
     left: calc(50% - var(--face-btn-dim) / 2);
 }
+
 .btn-x {
     top: calc(50% - var(--face-btn-dim) / 2);
     left: 0;
 }
+
 .btn-b {
     top: calc(50% - var(--face-btn-dim) / 2);
     right: 0;
 }
 
-/* Subtle colored inner rings */
-.btn-y .btn-inner-ring { border-color: rgba(245, 158, 11, 0.30); }
-.btn-x .btn-inner-ring { border-color: rgba(59, 130, 246, 0.30); }
-.btn-b .btn-inner-ring { border-color: rgba(239, 68, 68, 0.30); }
-.btn-a .btn-inner-ring { border-color: rgba(16, 185, 129, 0.30); }
+/* Subtle Colored Inner Rings */
+.btn-y .btn-inner-ring { border-color: rgba(245, 158, 11, 0.35); }
+.btn-x .btn-inner-ring { border-color: rgba(59, 130, 246, 0.35); }
+.btn-b .btn-inner-ring { border-color: rgba(239, 68, 68, 0.35); }
+.btn-a .btn-inner-ring { border-color: rgba(16, 185, 129, 0.35); }
 
 .btn-y .btn-legend { color: #D4A82A; }
 .btn-x .btn-legend { color: #5B9CF0; }
 .btn-b .btn-legend { color: #E86060; }
 .btn-a .btn-legend { color: #2CC48A; }
 
-/* Active Yellow Volt */
+/* Active Yellow Volt Face Button */
 .face-btn.active {
     transform: scale(0.95) translateY(1px) !important;
     border-color: var(--volt-yellow) !important;
     background: var(--volt-fill) !important;
     box-shadow: 0 0 16px var(--volt-glow),
                 0 0 28px var(--volt-dim),
-                inset 0 1px 0 rgba(255, 255, 255, 0.18),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2),
                 inset 0 0 6px var(--volt-fill) !important;
 }
 
@@ -737,7 +853,21 @@ html, body {
     box-shadow: 0 0 6px var(--volt-glow) !important;
 }
 
-/* ── 9. Portrait Mode Warning ───────────────────────────────────────────── */
+/* Lower-Inner Right Thumbstick (left: 14px, bottom: 14px) */
+.right-stick-housing {
+    position: absolute;
+    left: 14px;
+    bottom: max(14px, env(safe-area-inset-bottom));
+    width: var(--stick-socket);
+    height: var(--stick-socket);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-shrink: 0;
+    z-index: 15;
+}
+
+/* ── 7. Portrait Orientation Lock Warning Prompt ────────────────────────── */
 .portrait-warning {
     display: none;
     position: fixed;

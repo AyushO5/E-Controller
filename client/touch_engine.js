@@ -7,6 +7,7 @@
  *  - Thumbstick: 0.12 radial deadzone, hard radial clamp, no overflow
  *  - Face buttons support thumb-roll via pointerenter/pointerleave-while-down
  *  - touch-action:none / user-select:none / overscroll-behavior:none on root
+ *  - Global pointer tracking on window and zero-touch failsafe
  */
 
 // Button bitmasks matching host protocol.py
@@ -55,8 +56,7 @@ class TouchEngine {
         this._triggerPtrs  = new Map();   // 'lt'|'rt' → pointerId
 
         // ── Stick tracking ────────────────────────────────────────────────
-        this._stickPtrs    = new Map();   // 'left'|'right' → StickState
-        // StickState { pointerId, originX, originY, nub }
+        this._stickStates  = { left: null, right: null };
 
         this.DEADZONE        = 0.12;   // 12% radial deadzone
         this.MAX_STICK_PX    = 48;     // socket radius in CSS pixels
@@ -72,17 +72,45 @@ class TouchEngine {
         this._bindDigitalButtons();
         this._bindTriggers();
         this._bindSticks();
+        this._bindZeroTouchFailsafe();
     }
 
-    // ── Global gesture suppression ────────────────────────────────────────
+    // ── Global gesture suppression & iOS Safari hardening ─────────────────
     _lockRootGestures() {
         const root = document.documentElement;
-        // Belt-and-suspenders: also set via JS in case CSS was not applied yet
-        root.style.touchAction      = 'none';
-        root.style.userSelect       = 'none';
-        root.style.overscrollBehavior = 'none';
-        document.body.style.touchAction = 'none';
-        document.body.style.overscrollBehavior = 'none';
+        const body = document.body;
+        const shell = document.getElementById('controller-shell') || document.querySelector('.controller-shell');
+
+        // Apply touch-action: none; user-select: none; -webkit-user-select: none;
+        // -webkit-touch-callout: none; overscroll-behavior: none;
+        // to html, body, root controller wrapper, and every stick/button element
+        const targets = [
+            root, body, shell,
+            ...document.querySelectorAll(
+                '.trigger-paddle, .bumper-paddle, .console-btn, .guide-jewel, ' +
+                '.thumbstick-housing, .stick-well, .stick-nub, .stick-concave-cap, ' +
+                '.dpad-housing, .dpad-btn, .action-diamond-housing, .face-btn, [data-button], .fullscreen-pill'
+            )
+        ].filter(Boolean);
+
+        targets.forEach(el => {
+            el.style.touchAction = 'none';
+            el.style.userSelect = 'none';
+            el.style.webkitUserSelect = 'none';
+            el.style.webkitTouchCallout = 'none';
+            el.style.overscrollBehavior = 'none';
+        });
+
+        // Attach { passive: false } touchstart and touchmove listeners to the root
+        // controller container that call e.preventDefault() so Safari never turns
+        // fast thumb drags near the screen edges into back/forward page swipes
+        if (shell) {
+            const blockSafariGestures = e => {
+                e.preventDefault();
+            };
+            shell.addEventListener('touchstart', blockSafariGestures, { passive: false });
+            shell.addEventListener('touchmove', blockSafariGestures, { passive: false });
+        }
     }
 
     // ── Digital Buttons ───────────────────────────────────────────────────
@@ -208,51 +236,93 @@ class TouchEngine {
     }
 
     _setupStick(zoneId, nubId, side) {
-        const zone = document.getElementById(zoneId);
-        const nub  = document.getElementById(nubId);
-        if (!zone || !nub) return;
+        const socketElement = document.getElementById(zoneId);
+        const nub           = document.getElementById(nubId);
+        if (!socketElement || !nub) return;
 
-        zone.addEventListener('pointerdown', e => {
-            e.preventDefault(); e.stopPropagation();
-            if (this._stickPtrs.has(side)) return;   // second finger ignored
-
-            const rect = zone.getBoundingClientRect();
-            try { zone.setPointerCapture(e.pointerId); } catch (_) {}
-
-            this._stickPtrs.set(side, {
-                pointerId: e.pointerId,
-                originX: rect.left + rect.width  / 2,
-                originY: rect.top  + rect.height / 2,
-                nub,
-            });
-            zone.classList.add('active');
-            this._moveStick(side, e.clientX, e.clientY);
-        }, { passive: false });
-
-        zone.addEventListener('pointermove', e => {
-            const st = this._stickPtrs.get(side);
-            if (!st || st.pointerId !== e.pointerId) return;
-            e.preventDefault(); e.stopPropagation();
-            this._moveStick(side, e.clientX, e.clientY);
-        }, { passive: false });
-
-        const up = e => {
-            const st = this._stickPtrs.get(side);
-            if (!st || st.pointerId !== e.pointerId) return;
-            e.preventDefault(); e.stopPropagation();
-            this._stickPtrs.delete(side);
-            zone.classList.remove('active');
-            nub.style.transform = 'translate3d(0px,0px,0px)';
-            if (side === 'left') { this.lx = 0; this.ly = 0; }
-            else                 { this.rx = 0; this.ry = 0; }
+        const stickState = {
+            side,
+            socketElement,
+            nub,
+            activePointerId: null,
+            originX: 0,
+            originY: 0,
         };
-        zone.addEventListener('pointerup',          up, { passive: false });
-        zone.addEventListener('pointercancel',       up, { passive: false });
-        zone.addEventListener('lostpointercapture',  up, { passive: false });
+        this._stickStates[side] = stickState;
+
+        // On stick pointerdown, record activePointerId = e.pointerId and call
+        // socketElement.setPointerCapture(e.pointerId) inside a try/catch
+        socketElement.addEventListener('pointerdown', e => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (stickState.activePointerId !== null) return;   // second finger ignored
+
+            stickState.activePointerId = e.pointerId;
+            try {
+                socketElement.setPointerCapture(e.pointerId);
+            } catch (_) {}
+
+            const rect = socketElement.getBoundingClientRect();
+            stickState.originX = rect.left + rect.width  / 2;
+            stickState.originY = rect.top  + rect.height / 2;
+
+            socketElement.classList.add('active');
+            this._moveStick(side, e.clientX, e.clientY);
+        }, { passive: false });
+
+        // Handle pointermove on window, matching strictly by e.pointerId === activePointerId
+        const onPointerMove = e => {
+            if (stickState.activePointerId === null || e.pointerId !== stickState.activePointerId) return;
+            e.preventDefault();
+            e.stopPropagation();
+            this._moveStick(side, e.clientX, e.clientY);
+        };
+
+        // Handle pointerup, pointercancel, and lostpointercapture on window (not just the stick element),
+        // matching strictly by e.pointerId === activePointerId
+        const onPointerRelease = e => {
+            if (stickState.activePointerId === null || e.pointerId !== stickState.activePointerId) return;
+            e.preventDefault();
+            e.stopPropagation();
+            this._releaseStick(side);
+        };
+
+        window.addEventListener('pointermove', onPointerMove, { passive: false });
+        window.addEventListener('pointerup', onPointerRelease, { passive: false });
+        window.addEventListener('pointercancel', onPointerRelease, { passive: false });
+        window.addEventListener('lostpointercapture', onPointerRelease, { passive: false });
+        socketElement.addEventListener('lostpointercapture', onPointerRelease, { passive: false });
+    }
+
+    _releaseStick(side) {
+        const st = this._stickStates[side];
+        if (!st) return;
+
+        // Whenever pointerup, pointercancel, or lostpointercapture fires, immediately clear
+        // activePointerId = null, reset thumb cap transform to translate(0px, 0px), and set (x, y) to (0, 0)
+        st.activePointerId = null;
+        st.socketElement.classList.remove('active');
+        st.nub.style.transform = 'translate(0px, 0px)';
+
+        const wasNonZero = side === 'left'
+            ? (this.lx !== 0 || this.ly !== 0)
+            : (this.rx !== 0 || this.ry !== 0);
+
+        if (side === 'left') {
+            this.lx = 0;
+            this.ly = 0;
+        } else {
+            this.rx = 0;
+            this.ry = 0;
+        }
+
+        if (wasNonZero) {
+            window.App?.flushReturnToCenter?.();
+        }
     }
 
     _moveStick(side, clientX, clientY) {
-        const st = this._stickPtrs.get(side);
+        const st = this._stickStates[side];
         if (!st) return;
 
         const dx  = clientX - st.originX;
@@ -265,13 +335,21 @@ class TouchEngine {
         const cx = dx * scale;
         const cy = dy * scale;
 
-        st.nub.style.transform = `translate3d(${cx.toFixed(1)}px,${cy.toFixed(1)}px,0px)`;
+        st.nub.style.transform = `translate(${cx.toFixed(1)}px, ${cy.toFixed(1)}px)`;
 
         // Deadzone: map [0, maxR] → [0, 1], suppress values below DEADZONE
         const norm = Math.min(len / maxR, 1.0);
         if (norm < this.DEADZONE) {
+            const wasNonZero = side === 'left'
+                ? (this.lx !== 0 || this.ly !== 0)
+                : (this.rx !== 0 || this.ry !== 0);
+
             if (side === 'left') { this.lx = 0; this.ly = 0; }
             else                 { this.rx = 0; this.ry = 0; }
+
+            if (wasNonZero) {
+                window.App?.flushReturnToCenter?.();
+            }
             return;
         }
 
@@ -292,6 +370,52 @@ class TouchEngine {
         }
     }
 
+    // ── Zero-Touch Failsafe (iOS Safari gesture recovery) ───────────────────
+    _bindZeroTouchFailsafe() {
+        const onZeroTouch = e => {
+            if (e.touches && e.touches.length === 0) {
+                this.forceResetZeroTouch();
+            }
+        };
+        window.addEventListener('touchend', onZeroTouch, { passive: true });
+        window.addEventListener('touchcancel', onZeroTouch, { passive: true });
+    }
+
+    forceResetZeroTouch() {
+        const hadNonZeroStick = (this.lx !== 0 || this.ly !== 0 || this.rx !== 0 || this.ry !== 0);
+
+        // Force-reset both Left and Right sticks to (0, 0)
+        if (this._stickStates.left) {
+            this._releaseStick('left');
+        } else {
+            this.lx = 0; this.ly = 0;
+        }
+
+        if (this._stickStates.right) {
+            this._releaseStick('right');
+        } else {
+            this.rx = 0; this.ry = 0;
+        }
+
+        // Clear all active button flags
+        this.buttons = 0;
+        this.lt = 0;
+        this.rt = 0;
+        this._ptrToButtons.clear();
+        this._btnToPtr.clear();
+        this._triggerPtrs.clear();
+
+        // Clear visual active states
+        document.querySelectorAll(
+            '[data-button].active, .trigger-paddle.active, .bumper-paddle.active, ' +
+            '.console-btn.active, .guide-jewel.active, .stick-well.active'
+        ).forEach(el => el.classList.remove('active'));
+
+        if (hadNonZeroStick) {
+            window.App?.flushReturnToCenter?.();
+        }
+    }
+
     // ── Public API for app.js ─────────────────────────────────────────────
     getState() {
         return {
@@ -304,21 +428,7 @@ class TouchEngine {
 
     /** Force-release every tracked pointer (called by app.js on SUSPEND). */
     releaseAll() {
-        this.buttons = 0;
-        this.lx = 0; this.ly = 0;
-        this.rx = 0; this.ry = 0;
-        this.lt = 0; this.rt = 0;
-        this._ptrToButtons.clear();
-        this._btnToPtr.clear();
-        this._triggerPtrs.clear();
-        // Reset stick nubs visually
-        for (const [, st] of this._stickPtrs) {
-            st.nub.style.transform = 'translate3d(0px,0px,0px)';
-        }
-        this._stickPtrs.clear();
-        // Clear active class from all interactive elements
-        document.querySelectorAll('[data-button].active, .trigger-paddle.active, .stick-well.active')
-            .forEach(el => el.classList.remove('active'));
+        this.forceResetZeroTouch();
     }
 }
 

@@ -1,7 +1,8 @@
 /**
  * Virtual Gamepad Client — Checkpoint 3
  * Zero-alloc 60Hz binary transport, SUSPENDED state machine,
- * visibilitychange/blur failsafe, and exponential-backoff reconnect.
+ * visibilitychange/blur failsafe, guaranteed return-to-center flush,
+ * and exponential-backoff reconnect.
  *
  * Wire frame layout (16 bytes, Little-Endian):
  *   [0]     uint8   msg_type   0x01 = input, 0x00 = neutral/suspended
@@ -74,6 +75,13 @@ class GamepadApp {
 
         // HUD stream state label ('ACTIVE' | 'STALE')
         this._streamState = 'ACTIVE';
+
+        // Stick state tracking for guaranteed return-to-center flushes
+        this._prevLx = 0;
+        this._prevLy = 0;
+        this._prevRx = 0;
+        this._prevRy = 0;
+        this._flushConsecutiveFrames = 0;
     }
 
     // ─── Boot ────────────────────────────────────────────────────────────────
@@ -242,11 +250,39 @@ class GamepadApp {
         requestAnimationFrame(tick);
     }
 
-    _sendFrame() {
+    /**
+     * Force-flush return-to-center frame immediately and guarantee for at least 2 consecutive
+     * frames so a single jittery Wi-Fi packet never leaves vgamepad holding the last stick angle.
+     */
+    flushReturnToCenter() {
+        this._flushConsecutiveFrames = Math.max(this._flushConsecutiveFrames, 2);
+        this._sendFrame(/*force=*/ true);
+    }
+
+    _sendFrame(force = false) {
         if (this._state === State.SUSPENDED) return;   // neutral already sent
         if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
 
         const inp  = window.TouchEngine.getState();
+
+        // Detect transition from non-zero to (0, 0) on either stick
+        const leftReturnedToCenter  = (this._prevLx !== 0 || this._prevLy !== 0) && (inp.lx === 0 && inp.ly === 0);
+        const rightReturnedToCenter = (this._prevRx !== 0 || this._prevRy !== 0) && (inp.rx === 0 && inp.ry === 0);
+
+        if (leftReturnedToCenter || rightReturnedToCenter) {
+            this._flushConsecutiveFrames = Math.max(this._flushConsecutiveFrames, 2);
+        }
+
+        const isFlushing = this._flushConsecutiveFrames > 0;
+        if (isFlushing && !force) {
+            this._flushConsecutiveFrames--;
+        }
+
+        this._prevLx = inp.lx;
+        this._prevLy = inp.ly;
+        this._prevRx = inp.rx;
+        this._prevRy = inp.ry;
+
         const v    = this._view;
         const seq  = this._seq;
 
@@ -288,6 +324,11 @@ class GamepadApp {
         console.log(`[GamepadApp] SUSPENDED (${reason}) — sending neutral frame.`);
         this._setState(State.SUSPENDED, 'Suspended');
         this._stopPing();
+        this._flushConsecutiveFrames = 0;
+        this._prevLx = 0;
+        this._prevLy = 0;
+        this._prevRx = 0;
+        this._prevRy = 0;
         window.TouchEngine?.releaseAll();   // clear all held buttons/sticks
         this._sendNeutralFrame();   // zero all axes/buttons on host immediately
     }
@@ -295,6 +336,11 @@ class GamepadApp {
     _resume() {
         if (this._state !== State.SUSPENDED) return;
         console.log('[GamepadApp] Resuming from SUSPENDED.');
+        this._flushConsecutiveFrames = 0;
+        this._prevLx = 0;
+        this._prevLy = 0;
+        this._prevRx = 0;
+        this._prevRy = 0;
         if (this.socket?.readyState === WebSocket.OPEN) {
             this._setState(State.CONNECTED, 'Connected');
             this._startPing();
