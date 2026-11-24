@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <!-- True Fullscreen iOS PWA Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Gamepad">
+    <meta name="theme-color" content="#0A0C10">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="manifest.json">
+    
+    <title>Virtual Gamepad</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Portrait Mode Warning Prompt -->
+    <div class="portrait-warning" id="portrait-warning">
+        <div class="rotate-device-glyph">
+            <div class="rotate-phone-body"></div>
+            <div class="rotate-arrow">⟲</div>
+        </div>
+        <h2>ROTATE TO LANDSCAPE</h2>
+        <p>Tactile virtual gamepad requires horizontal orientation.</p>
+    </div>
+
+    <!-- Main Matte-Black Hardware Controller Shell -->
+    <main class="controller-shell" id="controller-shell">
+
+        <!-- Unified Hardware Bridge & Deck Underlays (Backbone One inspired) -->
+        <div class="deck-surface deck-left" aria-hidden="true"></div>
+        <div class="deck-bridge" aria-hidden="true"></div>
+        <div class="deck-surface deck-right" aria-hidden="true"></div>
+
+        <!-- Top-Left Corner: Shoulder Paddles (LT on top, LB below) -->
+        <div class="shoulder-cluster left-shoulder">
+            <button class="trigger-paddle trigger-lt" id="trigger-lt" aria-label="Left Trigger">
+                <span class="paddle-label">LT</span>
+                <span class="paddle-specular"></span>
+            </button>
+            <button class="bumper-paddle bumper-lb" id="btn-lb" data-button="LB" aria-label="Left Bumper">
+                <span class="paddle-label">LB</span>
+                <span class="paddle-specular"></span>
+            </button>
+        </div>
+
+        <!-- Top-Right Corner: Shoulder Paddles (RT on top, RB below) -->
+        <div class="shoulder-cluster right-shoulder">
+            <button class="trigger-paddle trigger-rt" id="trigger-rt" aria-label="Right Trigger">
+                <span class="paddle-label">RT</span>
+                <span class="paddle-specular"></span>
+            </button>
+            <button class="bumper-paddle bumper-rb" id="btn-rb" data-button="RB" aria-label="Right Bumper">
+                <span class="paddle-label">RB</span>
+                <span class="paddle-specular"></span>
+            </button>
+        </div>
+
+        <!-- Top-Center: Telemetry HUD & System Controls Row -->
+        <header class="center-console" id="hardware-notch">
+            <!-- Top Telemetry Status Pill -->
+            <div class="notch-pill status-badge connecting" id="status-badge">
+                <span class="notch-label player-pill">P1</span>
+                <span class="notch-sep">•</span>
+                <span class="status-dot"></span>
+                <span class="status-text">Connecting...</span>
+                <span class="notch-sep">•</span>
+                <span class="latency-value" id="latency-badge">-- ms</span>
+                <span class="notch-sep">•</span>
+                <span class="driver-tag" id="driver-badge">Xbox 360</span>
+                <button class="fullscreen-pill" id="btn-fullscreen" aria-label="Toggle Fullscreen" title="Toggle Fullscreen">
+                    <span class="fs-glyph">⛶</span>
+                </button>
+            </div>
+
+            <!-- System Buttons Row: BACK, Guide, START (12px gap directly below status) -->
+            <div class="console-actions">
+                <button class="console-btn btn-back" id="btn-back" data-button="BACK" aria-label="Back">
+                    <span class="console-icon">⧏</span>
+                    <span class="console-text">BACK</span>
+                </button>
+                <button class="guide-jewel" id="btn-guide" data-button="GUIDE" aria-label="Xbox Guide Button">
+                    <div class="jewel-outer-ring">
+                        <div class="jewel-core">
+                            <span class="jewel-x-glyph">✕</span>
+                        </div>
+                    </div>
+                </button>
+                <button class="console-btn btn-start" id="btn-start" data-button="START" aria-label="Start">
+                    <span class="console-text">START</span>
+                    <span class="console-icon">⧐</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Left Deck: Primary Left Stick (top: 60%, left: 11%) -->
+        <div class="thumbstick-housing left-stick-housing" aria-label="Left Thumbstick">
+            <div class="bezel-ticks"></div>
+            <div class="stick-well" id="left-stick-zone">
+                <div class="stick-nub" id="left-stick-nub">
+                    <div class="stick-concave-cap">
+                        <div class="stick-grip-ridges"></div>
+                        <div class="stick-accent-dot"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Left Deck: Bottom-Inner D-Pad (bottom: 16px, left: 27%) -->
+        <div class="dpad-housing" id="dpad-container" aria-label="Directional Pad">
+            <div class="dpad-cross-base"></div>
+            <button class="dpad-btn dpad-up" data-button="DPAD_UP" aria-label="D-Pad Up">
+                <span class="dpad-glyph">▲</span>
+            </button>
+            <button class="dpad-btn dpad-down" data-button="DPAD_DOWN" aria-label="D-Pad Down">
+                <span class="dpad-glyph">▼</span>
+            </button>
+            <button class="dpad-btn dpad-left" data-button="DPAD_LEFT" aria-label="D-Pad Left">
+                <span class="dpad-glyph">◀</span>
+            </button>
+            <button class="dpad-btn dpad-right" data-button="DPAD_RIGHT" aria-label="D-Pad Right">
+                <span class="dpad-glyph">▶</span>
+            </button>
+            <div class="dpad-center-well"></div>
+        </div>
+
+        <!-- Right Deck: Primary ABXY Diamond (top: 60%, right: 11%) -->
+        <div class="action-diamond-housing" id="action-diamond" aria-label="Action Buttons">
+            <div class="diamond-backing-plate"></div>
+            <button class="face-btn btn-y" data-button="Y" aria-label="Button Y">
+                <span class="btn-inner-ring"></span>
+                <span class="btn-legend">Y</span>
+            </button>
+            <button class="face-btn btn-x" data-button="X" aria-label="Button X">
+                <span class="btn-inner-ring"></span>
+                <span class="btn-legend">X</span>
+            </button>
+            <button class="face-btn btn-b" data-button="B" aria-label="Button B">
+                <span class="btn-inner-ring"></span>
+                <span class="btn-legend">B</span>
+            </button>
+            <button class="face-btn btn-a" data-button="A" aria-label="Button A">
+                <span class="btn-inner-ring"></span>
+                <span class="btn-legend">A</span>
+            </button>
+        </div>
+
+        <!-- Right Deck: Bottom-Inner Right Stick (bottom: 16px, right: 27%) -->
+        <div class="thumbstick-housing right-stick-housing" aria-label="Right Thumbstick">
+            <div class="bezel-ticks"></div>
+            <div class="stick-well" id="right-stick-zone">
+                <div class="stick-nub" id="right-stick-nub">
+                    <div class="stick-concave-cap">
+                        <div class="stick-grip-ridges"></div>
+                        <div class="stick-accent-dot"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Client Engine Scripts (load order: haptics → touch_engine → app) -->
+    <script src="haptics.js"></script>
+    <script src="touch_engine.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

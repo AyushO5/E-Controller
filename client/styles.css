@@ -1,0 +1,788 @@
+/* ==========================================================================
+   Virtual Gamepad — Carbon & Volt Ergonomic Handheld Controller UI
+   Inspired by Backbone One & Xbox Elite Controller
+   Theme: Matte Obsidian (#0A0C10) · Restrained Electric Yellow (#FACC15)
+   Lowered Natural Thumb-Arc Placement: Primary @ 60% dvh · Secondary @ Bottom Inner
+   ========================================================================== */
+
+/* ── Design Tokens ──────────────────────────────────────────────────────── */
+:root {
+    /* Chassis & Surfaces */
+    --chassis-bg:        #0A0C10;
+    --deck-bg:           #101319;
+    --control-surface:   #161B24;
+    --control-surface-hi:#1D2330;
+    --control-surface-lo:#0E1117;
+
+    /* Hardware Borders & Highlights */
+    --border-deck:       rgba(255, 255, 255, 0.06);
+    --border-control:    rgba(255, 255, 255, 0.08);
+    --border-control-hi: rgba(255, 255, 255, 0.12);
+    --inner-specular:    rgba(255, 255, 255, 0.08);
+
+    /* Electric Yellow Volt Accent (Active Only) */
+    --volt-yellow:       #FACC15;
+    --volt-glow:         rgba(250, 204, 21, 0.55);
+    --volt-fill:         rgba(250, 204, 21, 0.16);
+    --volt-dim:          rgba(250, 204, 21, 0.25);
+
+    /* Typography & Glyphs */
+    --text-white:        #F3F4F6;
+    --text-slate:        #7D8590;
+    --text-dark:         #484F58;
+
+    /* Status Telemetry */
+    --status-green:      #10B981;
+    --status-amber:      #F59E0B;
+    --status-red:        #EF4444;
+
+    /* Responsive Scale Clamps */
+    --stick-socket:      clamp(100px, 14vw, 120px);
+    --stick-cap:         clamp(50px, 7vw, 60px);
+    --dpad-dim:          clamp(112px, 15vw, 128px);
+    --dpad-arm-dim:      clamp(38px, 5.2vw, 44px);
+    --diamond-dim:       clamp(144px, 19.5vw, 168px);
+    --face-btn-dim:      clamp(44px, 6vw, 52px);
+    --trigger-w:         clamp(100px, 14vw, 124px);
+    --bumper-w:          clamp(88px, 12vw, 108px);
+}
+
+/* ── 1. Global Reset & Mobile Gesture Locks ─────────────────────────────── */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: none !important;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
+    overflow: hidden;
+    position: fixed;
+    background-color: var(--chassis-bg);
+    color: var(--text-white);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    overscroll-behavior: none;
+}
+
+/* ── 2. Unified Hardware Chassis ────────────────────────────────────────── */
+.controller-shell {
+    position: relative;
+    width: 100vw;
+    width: 100dvw;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    background: radial-gradient(ellipse at 50% 35%, #131722 0%, var(--chassis-bg) 65%, #050608 100%);
+}
+
+/* ── 3. Sculpted Controller Decks & Hardware Bridge ─────────────────────── */
+.deck-surface {
+    position: absolute;
+    top: max(8px, env(safe-area-inset-top));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: clamp(260px, 38vw, 360px);
+    background: linear-gradient(180deg, #12151D 0%, var(--deck-bg) 100%);
+    border: 1px solid var(--border-deck);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06),
+                inset 0 -2px 0 rgba(0, 0, 0, 0.7),
+                0 8px 32px rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.deck-left {
+    left: max(8px, env(safe-area-inset-left));
+    border-radius: 28px 20px 24px 32px;
+}
+
+.deck-right {
+    right: max(8px, env(safe-area-inset-right));
+    border-radius: 20px 28px 32px 24px;
+}
+
+.deck-bridge {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: clamp(200px, 28vw, 280px);
+    height: 52px;
+    background: linear-gradient(180deg, #141822 0%, var(--chassis-bg) 100%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 0 0 16px 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* ── 4. Compact Shoulder Paddles (Top Corners Only) ─────────────────────── */
+.shoulder-cluster {
+    position: absolute;
+    top: max(10px, env(safe-area-inset-top));
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 10;
+}
+
+.left-shoulder {
+    left: max(16px, env(safe-area-inset-left));
+    align-items: flex-start;
+}
+
+.right-shoulder {
+    right: max(16px, env(safe-area-inset-right));
+    align-items: flex-end;
+}
+
+.trigger-paddle, .bumper-paddle {
+    position: relative;
+    background: var(--control-surface);
+    border: 1px solid var(--border-control);
+    color: var(--text-white);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    box-shadow: inset 0 1px 0 var(--inner-specular),
+                inset 0 -2px 0 rgba(0, 0, 0, 0.6),
+                0 3px 8px rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.05s ease, box-shadow 0.05s ease, border-color 0.05s ease, background-color 0.05s ease;
+}
+
+.trigger-paddle::after, .bumper-paddle::after {
+    content: '';
+    position: absolute;
+    top: -6px; bottom: -6px; left: -6px; right: -6px;
+}
+
+.trigger-paddle {
+    width: var(--trigger-w);
+    height: 36px;
+    border-radius: 12px 12px 5px 5px;
+    background: linear-gradient(180deg, var(--control-surface-hi) 0%, var(--control-surface) 100%);
+    border-color: var(--border-control-hi);
+}
+
+.bumper-paddle {
+    width: var(--bumper-w);
+    height: 30px;
+    border-radius: 5px 5px 10px 10px;
+    background: var(--control-surface);
+}
+
+/* Active Volt / Yellow Press State */
+.trigger-paddle.active, .bumper-paddle.active {
+    transform: scale(0.95) translateY(1px) !important;
+    border-color: var(--volt-yellow) !important;
+    background: var(--volt-fill) !important;
+    box-shadow: 0 0 16px var(--volt-glow),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+.trigger-paddle.active .paddle-label,
+.bumper-paddle.active .paddle-label {
+    color: var(--volt-yellow);
+    text-shadow: 0 0 6px var(--volt-glow);
+}
+
+/* ── 5. Top-Center Telemetry & System Row ────────────────────────────────── */
+.center-console {
+    position: absolute;
+    top: max(8px, env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    z-index: 20;
+}
+
+/* Top Telemetry Status Bar */
+.notch-pill {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: linear-gradient(180deg, #12151C 0%, #080A0E 100%);
+    border: 1px solid var(--border-control);
+    border-radius: 10px;
+    padding: 3px 10px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.6),
+                inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    height: 26px;
+}
+
+.notch-label.player-pill {
+    background: #1C2130;
+    color: var(--volt-yellow);
+    border: 1px solid rgba(250, 204, 21, 0.25);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 800;
+}
+
+.notch-sep {
+    color: var(--text-dark);
+    font-size: 8px;
+}
+
+.status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--text-dark);
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    flex-shrink: 0;
+}
+
+.status-text {
+    color: var(--text-slate);
+    font-size: 10px;
+}
+
+.status-badge.connected .status-dot {
+    background-color: var(--volt-yellow);
+    box-shadow: 0 0 8px var(--volt-yellow);
+}
+
+.status-badge.connecting .status-dot {
+    background-color: var(--status-amber);
+    box-shadow: 0 0 8px var(--status-amber);
+}
+
+.status-badge.disconnected .status-dot,
+.status-badge.reconnecting .status-dot {
+    background-color: var(--status-red);
+    box-shadow: 0 0 8px var(--status-red);
+}
+
+.status-badge.stale .status-dot {
+    background-color: var(--status-amber);
+    box-shadow: 0 0 8px var(--status-amber);
+    animation: stale-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes stale-pulse {
+    from { opacity: 1; }
+    to   { opacity: 0.4; }
+}
+
+.latency-value {
+    color: var(--text-slate);
+    font-variant-numeric: tabular-nums;
+    font-size: 10px;
+}
+
+.driver-tag {
+    color: var(--text-slate);
+    font-size: 9px;
+}
+
+/* Crisp icon-only fullscreen toggle button inside status pill */
+.fullscreen-pill {
+    background: transparent;
+    border: none;
+    color: var(--text-slate);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 2px 0 4px;
+    margin-left: 2px;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    height: 14px;
+    transition: color 0.15s ease;
+}
+
+.fullscreen-pill:hover, .fullscreen-pill:active {
+    color: var(--volt-yellow);
+}
+
+.fs-glyph {
+    font-size: 11px;
+}
+
+/* System Row (12px gap directly beneath status pill) */
+.console-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+}
+
+.console-btn {
+    width: 70px;
+    height: 30px;
+    background: var(--control-surface);
+    border: 1px solid var(--border-control);
+    border-radius: 8px;
+    color: var(--text-slate);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    box-shadow: inset 0 1px 0 var(--inner-specular),
+                0 2px 5px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.05s ease, box-shadow 0.05s ease, background-color 0.05s ease;
+}
+
+.console-btn::after {
+    content: '';
+    position: absolute;
+    top: -6px; bottom: -6px; left: -6px; right: -6px;
+}
+
+.console-icon { font-size: 10px; }
+.console-text { font-size: 9px; }
+
+.console-btn.active {
+    transform: scale(0.95) translateY(1px) !important;
+    border-color: var(--volt-yellow) !important;
+    background: var(--volt-fill) !important;
+    box-shadow: 0 0 10px var(--volt-glow) !important;
+    color: var(--volt-yellow) !important;
+}
+
+/* Circular Metallic Guide Button (36px × 36px) */
+.guide-jewel {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--control-surface);
+    border: 1.5px solid var(--border-control-hi);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: inset 0 1px 0 var(--border-control-hi),
+                0 3px 8px rgba(0, 0, 0, 0.6);
+    position: relative;
+    transition: transform 0.05s ease, box-shadow 0.05s ease, border-color 0.05s ease;
+}
+
+.guide-jewel::after {
+    content: '';
+    position: absolute;
+    top: -8px; bottom: -8px; left: -8px; right: -8px;
+}
+
+.jewel-outer-ring {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 40%, #1A1F2C 0%, #0A0C10 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.jewel-core {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: linear-gradient(180deg, #2E3545 0%, #161922 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.jewel-x-glyph {
+    color: var(--text-slate);
+    font-size: 11px;
+    font-weight: 900;
+}
+
+.guide-jewel.active {
+    transform: scale(0.95) translateY(1px) !important;
+    border-color: var(--volt-yellow) !important;
+    background: var(--volt-fill) !important;
+    box-shadow: 0 0 18px var(--volt-glow) !important;
+}
+
+.guide-jewel.active .jewel-x-glyph {
+    color: var(--volt-yellow) !important;
+    text-shadow: 0 0 6px var(--volt-yellow) !important;
+}
+
+/* ── 6. Thumbstick Sockets & Concave Caps ────────────────────────────────── */
+.thumbstick-housing {
+    width: var(--stick-socket);
+    height: var(--stick-socket);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* Left Stick — Lowered Primary Thumb Arc Position */
+.left-stick-housing {
+    position: absolute;
+    left: 11%;
+    top: 60%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+}
+
+/* Right Stick — Lower-Inner Secondary Arc Position */
+.right-stick-housing {
+    position: absolute;
+    right: 27%;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    transform: translateX(50%);
+    z-index: 10;
+}
+
+.bezel-ticks {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: repeating-conic-gradient(
+        from 0deg,
+        rgba(255, 255, 255, 0.10) 0deg 1deg,
+        transparent 1deg 30deg
+    );
+    -webkit-mask: radial-gradient(circle, transparent 44%, #000 45%, #000 50%, transparent 51%);
+    mask:         radial-gradient(circle, transparent 44%, #000 45%, #000 50%, transparent 51%);
+    pointer-events: none;
+}
+
+.stick-well {
+    position: relative;
+    width: 88%;
+    height: 88%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%, #070910 0%, #0E1118 70%, var(--control-surface) 100%);
+    box-shadow: inset 0 3px 12px rgba(0, 0, 0, 0.85),
+                inset 0 -1px 1px rgba(255, 255, 255, 0.06),
+                0 2px 6px rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--border-control);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.stick-nub {
+    position: relative;
+    width: var(--stick-cap);
+    height: var(--stick-cap);
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #252B3A 0%, #171C26 70%, #10131B 100%);
+    border: 2px solid rgba(255, 255, 255, 0.10);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14),
+                0 3px 10px rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+    transform: translate3d(0, 0, 0);
+    transition: transform 0.04s ease-out, border-color 0.1s ease, box-shadow 0.1s ease;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.stick-concave-cap {
+    width: 70%;
+    height: 70%;
+    border-radius: 50%;
+    background: radial-gradient(circle, #0F121A 0%, #1A1F2C 80%, var(--control-surface) 100%);
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.8),
+                inset 0 -1px 2px rgba(255, 255, 255, 0.06);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+.stick-grip-ridges {
+    position: absolute;
+    width: 65%;
+    height: 65%;
+    border-radius: 50%;
+    border: 1px dashed rgba(255, 255, 255, 0.10);
+    pointer-events: none;
+}
+
+.stick-accent-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.10);
+    transition: background-color 0.1s ease, box-shadow 0.1s ease;
+}
+
+.stick-well.active .stick-nub {
+    border-color: var(--volt-yellow) !important;
+    box-shadow: 0 0 14px var(--volt-glow),
+                0 0 24px var(--volt-dim),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+.stick-well.active .stick-accent-dot {
+    background-color: var(--volt-yellow);
+    box-shadow: 0 0 6px var(--volt-yellow);
+}
+
+/* ── 7. D-Pad — Lower-Inner Thumb Arc ───────────────────────────────────── */
+.dpad-housing {
+    position: absolute;
+    left: 27%;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    width: var(--dpad-dim);
+    height: var(--dpad-dim);
+    z-index: 10;
+}
+
+.dpad-cross-base {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.dpad-btn {
+    position: absolute;
+    width: var(--dpad-arm-dim);
+    height: var(--dpad-arm-dim);
+    background: var(--control-surface);
+    border: 1px solid var(--border-control);
+    box-shadow: inset 0 1px 0 var(--inner-specular),
+                inset 0 -2px 0 rgba(0, 0, 0, 0.5),
+                0 2px 5px rgba(0, 0, 0, 0.35);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--text-slate);
+    font-size: 13px;
+    cursor: pointer;
+    transition: transform 0.05s ease, box-shadow 0.05s ease, border-color 0.05s ease, background-color 0.05s ease;
+}
+
+.dpad-btn::after {
+    content: '';
+    position: absolute;
+    top: -5px; bottom: -5px; left: -5px; right: -5px;
+}
+
+.dpad-up {
+    top: 0;
+    left: calc(50% - var(--dpad-arm-dim) / 2);
+    border-radius: 8px 8px 2px 2px;
+}
+.dpad-down {
+    bottom: 0;
+    left: calc(50% - var(--dpad-arm-dim) / 2);
+    border-radius: 2px 2px 8px 8px;
+}
+.dpad-left {
+    top: calc(50% - var(--dpad-arm-dim) / 2);
+    left: 0;
+    border-radius: 8px 2px 2px 8px;
+}
+.dpad-right {
+    top: calc(50% - var(--dpad-arm-dim) / 2);
+    right: 0;
+    border-radius: 2px 8px 8px 2px;
+}
+
+.dpad-center-well {
+    position: absolute;
+    top: calc(50% - var(--dpad-arm-dim) / 2);
+    left: calc(50% - var(--dpad-arm-dim) / 2);
+    width: var(--dpad-arm-dim);
+    height: var(--dpad-arm-dim);
+    background: #0D1018;
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+}
+
+.dpad-btn.active {
+    transform: scale(0.95) translateY(1px) !important;
+    border-color: var(--volt-yellow) !important;
+    background: var(--volt-fill) !important;
+    box-shadow: 0 0 12px var(--volt-glow),
+                inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+    color: var(--volt-yellow) !important;
+}
+
+/* ── 8. ABXY Diamond — Lowered Primary Thumb Arc ────────────────────────── */
+.action-diamond-housing {
+    position: absolute;
+    right: 11%;
+    top: 60%;
+    transform: translate(50%, -50%);
+    width: var(--diamond-dim);
+    height: var(--diamond-dim);
+    z-index: 10;
+}
+
+.diamond-backing-plate {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.02) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.face-btn {
+    position: absolute;
+    width: var(--face-btn-dim);
+    height: var(--face-btn-dim);
+    border-radius: 50%;
+    background: var(--control-surface);
+    border: 1px solid var(--border-control);
+    box-shadow: inset 0 1px 0 var(--inner-specular),
+                inset 0 -2px 3px rgba(0, 0, 0, 0.55),
+                0 3px 8px rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.05s ease, box-shadow 0.05s ease, border-color 0.05s ease, background-color 0.05s ease;
+}
+
+.face-btn::after {
+    content: '';
+    position: absolute;
+    top: -6px; bottom: -6px; left: -6px; right: -6px;
+    border-radius: 50%;
+}
+
+.btn-inner-ring {
+    position: absolute;
+    width: 68%;
+    height: 68%;
+    border-radius: 50%;
+    border: 1.5px solid transparent;
+    pointer-events: none;
+    transition: border-color 0.1s ease, box-shadow 0.1s ease;
+}
+
+.btn-legend {
+    font-size: clamp(16px, 4vh, 20px);
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    position: relative;
+    z-index: 2;
+    color: var(--text-white);
+    transition: color 0.05s ease, text-shadow 0.05s ease;
+}
+
+.btn-y {
+    top: 0;
+    left: calc(50% - var(--face-btn-dim) / 2);
+}
+.btn-a {
+    bottom: 0;
+    left: calc(50% - var(--face-btn-dim) / 2);
+}
+.btn-x {
+    top: calc(50% - var(--face-btn-dim) / 2);
+    left: 0;
+}
+.btn-b {
+    top: calc(50% - var(--face-btn-dim) / 2);
+    right: 0;
+}
+
+/* Subtle colored inner rings */
+.btn-y .btn-inner-ring { border-color: rgba(245, 158, 11, 0.30); }
+.btn-x .btn-inner-ring { border-color: rgba(59, 130, 246, 0.30); }
+.btn-b .btn-inner-ring { border-color: rgba(239, 68, 68, 0.30); }
+.btn-a .btn-inner-ring { border-color: rgba(16, 185, 129, 0.30); }
+
+.btn-y .btn-legend { color: #D4A82A; }
+.btn-x .btn-legend { color: #5B9CF0; }
+.btn-b .btn-legend { color: #E86060; }
+.btn-a .btn-legend { color: #2CC48A; }
+
+/* Active Yellow Volt */
+.face-btn.active {
+    transform: scale(0.95) translateY(1px) !important;
+    border-color: var(--volt-yellow) !important;
+    background: var(--volt-fill) !important;
+    box-shadow: 0 0 16px var(--volt-glow),
+                0 0 28px var(--volt-dim),
+                inset 0 1px 0 rgba(255, 255, 255, 0.18),
+                inset 0 0 6px var(--volt-fill) !important;
+}
+
+.face-btn.active .btn-legend {
+    color: var(--volt-yellow) !important;
+    text-shadow: 0 0 8px var(--volt-glow) !important;
+}
+
+.face-btn.active .btn-inner-ring {
+    border-color: var(--volt-yellow) !important;
+    box-shadow: 0 0 6px var(--volt-glow) !important;
+}
+
+/* ── 9. Portrait Mode Warning ───────────────────────────────────────────── */
+.portrait-warning {
+    display: none;
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100dvh;
+    background: var(--chassis-bg);
+    z-index: 9999;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    text-align: center;
+    padding: 24px;
+}
+
+.rotate-device-glyph {
+    position: relative;
+    font-size: 42px;
+    margin-bottom: 8px;
+    animation: rotate-anim 2.5s infinite ease-in-out;
+}
+
+@keyframes rotate-anim {
+    0%, 15% { transform: rotate(0deg); }
+    50%, 65% { transform: rotate(-90deg); }
+    100% { transform: rotate(0deg); }
+}
+
+.portrait-warning h2 {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: var(--volt-yellow);
+}
+
+.portrait-warning p {
+    font-size: 13px;
+    color: var(--text-slate);
+    max-width: 280px;
+    line-height: 1.4;
+}
+
+@media (orientation: portrait) {
+    .portrait-warning {
+        display: flex;
+    }
+}
