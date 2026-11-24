@@ -33,6 +33,7 @@ class BaseGamepadDriver(ABC):
         self.device_name: str = "Unknown"
         self._prev_state: GamepadState = GamepadState.neutral()
         self.on_rumble: RumbleCallback = None
+        self._rumble_loop: Optional[asyncio.AbstractEventLoop] = None
 
     @abstractmethod
     def update(self, state: GamepadState): ...
@@ -47,26 +48,34 @@ class BaseGamepadDriver(ABC):
         """Ensure the underlying virtual device is instantiated and ready."""
         pass
 
-    def set_rumble_callback(self, cb: RumbleCallback):
+    def set_rumble_callback(
+        self,
+        cb: RumbleCallback,
+        loop: Optional[asyncio.AbstractEventLoop] = None,
+    ):
         """Register a callback invoked when force feedback occurs."""
         self.on_rumble = cb
+        if loop is not None:
+            self._rumble_loop = loop
+        else:
+            try:
+                self._rumble_loop = asyncio.get_running_loop()
+            except RuntimeError:
+                self._rumble_loop = None
 
     def _fire_rumble(self, low: int, high: int):
-        """Call on_rumble thread-safely."""
+        """Call on_rumble thread-safely across worker threads and event loops."""
         if self.on_rumble is None:
             return
+        target_loop = self._rumble_loop
+        if target_loop is not None and not target_loop.is_closed() and target_loop.is_running():
+            target_loop.call_soon_threadsafe(self.on_rumble, low, high)
+            return
         try:
-            loop = asyncio.get_running_loop()
-            loop.call_soon_threadsafe(self.on_rumble, low, high)
+            running_loop = asyncio.get_running_loop()
+            running_loop.call_soon_threadsafe(self.on_rumble, low, high)
         except RuntimeError:
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    loop.call_soon_threadsafe(self.on_rumble, low, high)
-                else:
-                    self.on_rumble(low, high)
-            except RuntimeError:
-                pass
+            self.on_rumble(low, high)
 
 
 # ---------------------------------------------------------------------------
@@ -278,9 +287,9 @@ class LinuxUInputGamepad(BaseGamepadDriver):
                 dev.write(ecodes.EV_KEY, code, 1 if now else 0)
 
         if state.lx != prev.lx: dev.write(ecodes.EV_ABS, ecodes.ABS_X,  state.lx)
-        if state.ly != prev.ly: dev.write(ecodes.EV_ABS, ecodes.ABS_Y,  -state.ly)
+        if state.ly != prev.ly: dev.write(ecodes.EV_ABS, ecodes.ABS_Y,  max(-32768, min(32767, -state.ly)))
         if state.rx != prev.rx: dev.write(ecodes.EV_ABS, ecodes.ABS_RX, state.rx)
-        if state.ry != prev.ry: dev.write(ecodes.EV_ABS, ecodes.ABS_RY, -state.ry)
+        if state.ry != prev.ry: dev.write(ecodes.EV_ABS, ecodes.ABS_RY, max(-32768, min(32767, -state.ry)))
         if state.lt != prev.lt: dev.write(ecodes.EV_ABS, ecodes.ABS_Z,  state.lt)
         if state.rt != prev.rt: dev.write(ecodes.EV_ABS, ecodes.ABS_RZ, state.rt)
 

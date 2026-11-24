@@ -44,7 +44,8 @@ def get_lan_ip() -> str:
 
 def print_banner(lan_ip: str, http_port: int, ws_port: int, driver_name: str, is_mock: bool):
     """Render terminal dashboard with ASCII art and QR code."""
-    url = f"http://{lan_ip}:{http_port}"
+    query = f"?port={ws_port}" if ws_port != 8765 else ""
+    url = f"http://{lan_ip}:{http_port}{query}"
     ws_url = f"ws://{lan_ip}:{ws_port}"
 
     print("\n" + "═" * 68)

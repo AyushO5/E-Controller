@@ -371,10 +371,6 @@ class GamepadApp {
             } catch (_) {}
         };
         this._fullscreenBtn.addEventListener('click', toggle);
-        this._fullscreenBtn.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            toggle();
-        });
     }
 
     // ─── Gesture locks (pinch-zoom, bounce scroll) ────────────────────────────

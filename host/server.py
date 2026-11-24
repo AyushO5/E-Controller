@@ -15,7 +15,7 @@ import json
 import logging
 import struct
 from pathlib import Path
-from typing import Optional, Set
+from typing import Dict, Optional, Set
 
 from aiohttp import web
 import websockets
@@ -29,6 +29,14 @@ logger = logging.getLogger("Server")
 RUMBLE_MSG_TYPE = 0x02
 RUMBLE_FRAME_FORMAT = "BBBB"   # msg_type, low_freq, high_freq, player_id
 RUMBLE_FRAME_SIZE   = struct.calcsize(RUMBLE_FRAME_FORMAT)   # 4 bytes
+
+
+def _is_ws_open(websocket) -> bool:
+    """Return True if websocket is open across websockets versions (<13 and >=13)."""
+    state = getattr(websocket, "state", None)
+    if state is not None:
+        return getattr(state, "name", None) == "OPEN"
+    return bool(getattr(websocket, "open", False))
 
 
 class ControllerServer:
@@ -51,14 +59,46 @@ class ControllerServer:
         self.http_runner: Optional[web.AppRunner] = None
         self.ws_server   = None
         self.active_websockets: Set = set()
+        self._ws_players: Dict = {}
 
         # Player slot counter (wraps P1–P4)
         self._player_counter = 0
+
+    def _attach_rumble_callback(self):
+        """Attach server-wide rumble callback with the active event loop."""
+        if self.driver is None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        self.driver.set_rumble_callback(self._on_driver_rumble, loop=loop)
+
+    def _on_driver_rumble(self, low: int, high: int):
+        """Broadcast 4-byte binary rumble frames to all connected open clients."""
+        if not self._ws_players:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        for ws, player_slot in list(self._ws_players.items()):
+            if not _is_ws_open(ws):
+                continue
+            frame = struct.pack(
+                RUMBLE_FRAME_FORMAT,
+                RUMBLE_MSG_TYPE,
+                low & 0xFF,
+                high & 0xFF,
+                player_slot & 0xFF,
+            )
+            loop.create_task(self._send_rumble_frame(ws, frame))
 
     def ensure_driver_ready(self):
         """Ensure virtual gamepad device is initialized and active."""
         if self.driver is None:
             self.driver = create_gamepad_driver(force_mock=self.force_mock)
+            self._attach_rumble_callback()
         elif self.driver.is_mock and not self.force_mock:
             # Check if user granted permissions since daemon start
             new_driver = create_gamepad_driver(force_mock=False)
@@ -69,6 +109,7 @@ class ControllerServer:
                 except Exception:
                     pass
                 self.driver = new_driver
+                self._attach_rumble_callback()
             else:
                 self.driver.ensure_initialized()
         else:
@@ -87,7 +128,7 @@ class ControllerServer:
         filename  = request.match_info.get("filename", "")
         safe_path = (self.client_dir / filename).resolve()
         base      = self.client_dir.resolve()
-        if not str(safe_path).startswith(str(base)) or not safe_path.exists():
+        if not safe_path.is_relative_to(base) or not safe_path.is_file():
             return web.Response(status=404, text="Not Found")
         return web.FileResponse(safe_path, headers=self._no_cache_headers())
 
@@ -127,25 +168,9 @@ class ControllerServer:
         )
 
         self.active_websockets.add(websocket)
+        self._ws_players[websocket] = player_slot
         watchdog.start()
         watchdog.feed()
-
-        # Register rumble callback: packs binary frame and sends to this socket
-        def _rumble_cb(low: int, high: int):
-            frame = struct.pack(
-                RUMBLE_FRAME_FORMAT,
-                RUMBLE_MSG_TYPE,
-                low  & 0xFF,
-                high & 0xFF,
-                player_slot & 0xFF,
-            )
-            try:
-                loop = asyncio.get_running_loop()
-                loop.create_task(self._send_rumble_frame(websocket, frame))
-            except RuntimeError:
-                pass
-
-        self.driver.set_rumble_callback(_rumble_cb)
 
         # Welcome / HELLO handshake response
         try:
@@ -173,14 +198,15 @@ class ControllerServer:
         finally:
             print(f"[WS] {player_label} disconnected ← {client_id}")
             watchdog.stop()
-            self.driver.set_rumble_callback(None)
             self.active_websockets.discard(websocket)
-            self.driver.reset()
+            self._ws_players.pop(websocket, None)
+            if not self.active_websockets:
+                self.driver.reset()
 
     async def _send_rumble_frame(self, websocket, frame: bytes):
         """Send a 4-byte rumble binary frame; silently drops if socket is closed."""
         try:
-            if websocket.open:
+            if _is_ws_open(websocket):
                 await websocket.send(frame)
         except Exception:
             pass
@@ -260,7 +286,7 @@ class ControllerServer:
 
     async def _push_status(self, websocket, state: str, player_slot: int):
         try:
-            if websocket.open:
+            if _is_ws_open(websocket):
                 await websocket.send(json.dumps({
                     "type":   "status",
                     "state":  state,
@@ -293,6 +319,7 @@ class ControllerServer:
         print(f"[WS] Input server on ws://{self.host}:{self.ws_port}")
 
     async def start(self):
+        self._attach_rumble_callback()
         await self.start_http()
         await self.start_ws()
 

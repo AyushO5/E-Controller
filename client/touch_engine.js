@@ -51,6 +51,7 @@ class TouchEngine {
         // only via thumb-roll, so we track per-button precisely)
         this._ptrToButtons = new Map();   // pointerId → Set<buttonName>
         this._btnToPtr     = new Map();   // buttonName → pointerId
+        this._btnElements  = new Map();   // buttonName → Element
 
         // ── Trigger tracking ──────────────────────────────────────────────
         this._triggerPtrs  = new Map();   // 'lt'|'rt' → pointerId
@@ -106,6 +107,9 @@ class TouchEngine {
         // fast thumb drags near the screen edges into back/forward page swipes
         if (shell) {
             const blockSafariGestures = e => {
+                if (e.target && e.target.closest && e.target.closest('#btn-fullscreen, .fullscreen-pill')) {
+                    return;
+                }
                 e.preventDefault();
             };
             shell.addEventListener('touchstart', blockSafariGestures, { passive: false });
@@ -120,12 +124,13 @@ class TouchEngine {
             const mask = BUTTON_MASKS[name];
             if (mask === undefined) return;
 
+            this._btnElements.set(name, el);
             const rollable = this._ROLLABLE.has(name);
 
-            // pointerdown — initial press
+            // pointerdown — initial press (skip capture on rollable buttons so thumb-roll works)
             el.addEventListener('pointerdown', e => {
                 e.preventDefault(); e.stopPropagation();
-                this._pressButton(e.pointerId, name, mask, el);
+                this._pressButton(e.pointerId, name, mask, el, rollable);
             }, { passive: false });
 
             // pointerup / cancel / lostcapture — release
@@ -160,6 +165,21 @@ class TouchEngine {
                 }, { passive: false });
             }
         });
+
+        // Global release fallback so uncaptured rollable buttons never stick if pointer lifts off-button
+        const releaseAllForPointer = e => {
+            const held = this._ptrToButtons.get(e.pointerId);
+            if (!held || held.size === 0) return;
+            for (const name of Array.from(held)) {
+                const mask = BUTTON_MASKS[name];
+                const el = this._btnElements.get(name);
+                if (mask !== undefined && el) {
+                    this._releaseButton(e.pointerId, name, mask, el);
+                }
+            }
+        };
+        window.addEventListener('pointerup',     releaseAllForPointer, { passive: false });
+        window.addEventListener('pointercancel', releaseAllForPointer, { passive: false });
     }
 
     _pressButton(pointerId, name, mask, el, noCapture = false) {
@@ -189,8 +209,21 @@ class TouchEngine {
 
         owned.delete(name);
         if (owned.size === 0) this._ptrToButtons.delete(pointerId);
-        this._btnToPtr.delete(name);
 
+        // Keep button pressed if another active pointer is still holding it
+        let holderPtr = null;
+        for (const [pid, btns] of this._ptrToButtons) {
+            if (btns.has(name)) {
+                holderPtr = pid;
+                break;
+            }
+        }
+        if (holderPtr !== null) {
+            this._btnToPtr.set(name, holderPtr);
+            return;
+        }
+
+        this._btnToPtr.delete(name);
         this.buttons &= ~mask;
         el.classList.remove('active');
     }
@@ -247,6 +280,7 @@ class TouchEngine {
             activePointerId: null,
             originX: 0,
             originY: 0,
+            maxR: 0,
         };
         this._stickStates[side] = stickState;
 
@@ -263,8 +297,10 @@ class TouchEngine {
             } catch (_) {}
 
             const rect = socketElement.getBoundingClientRect();
+            const nubRect = nub.getBoundingClientRect();
             stickState.originX = rect.left + rect.width  / 2;
             stickState.originY = rect.top  + rect.height / 2;
+            stickState.maxR    = Math.max(16, (rect.width - nubRect.width) / 2);
 
             socketElement.classList.add('active');
             this._moveStick(side, e.clientX, e.clientY);
@@ -328,7 +364,7 @@ class TouchEngine {
         const dx  = clientX - st.originX;
         const dy  = clientY - st.originY;
         const len = Math.hypot(dx, dy);
-        const maxR = this.MAX_STICK_PX;
+        const maxR = st.maxR || this.MAX_STICK_PX;
 
         // Hard radial clamp — nub never overflows the socket
         const scale  = len > maxR ? maxR / len : 1;
