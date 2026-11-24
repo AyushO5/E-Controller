@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    
+
     <!-- True Fullscreen iOS PWA Support -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -11,7 +11,7 @@
     <meta name="theme-color" content="#0A0C10">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="manifest.json">
-    
+
     <title>Virtual Gamepad</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -29,28 +29,27 @@
     <!-- Main Matte-Black Hardware Controller Shell -->
     <main class="controller-shell" id="controller-shell">
 
-        <!-- Top-edge horizontal yellow hardware accent strips above trigger zones -->
+        <!-- Top-edge yellow hardware accent strips above the trigger zones -->
         <div class="hw-accent-strip accent-left" aria-hidden="true"></div>
         <div class="hw-accent-strip accent-right" aria-hidden="true"></div>
 
-        <!-- 3-Column Controller Grid (1.35fr 0.85fr 1.35fr) -->
+        <!-- 3-Column Grid: 1.35fr | 0.85fr | 1.35fr -->
         <div class="controller-grid">
 
-            <!-- ── LEFT COLUMN ─────────────────────────────────────────────── -->
-            <section class="controller-col col-left" aria-label="Left Controller Controls">
-                <!-- Top-Left Shoulder Cluster: Swept Wing LT + LB -->
+            <!-- ══ LEFT COLUMN ══════════════════════════════════════════ -->
+            <section class="controller-col col-left" aria-label="Left Controls">
+
+                <!-- LT (swept wing) stacked above LB -->
                 <div class="shoulder-cluster left-shoulder">
                     <button class="trigger-paddle trigger-lt" id="trigger-lt" aria-label="Left Trigger">
                         <span class="paddle-label">LT</span>
-                        <span class="paddle-specular"></span>
                     </button>
                     <button class="bumper-paddle bumper-lb" id="btn-lb" data-button="LB" aria-label="Left Bumper">
                         <span class="paddle-label">LB</span>
-                        <span class="paddle-specular"></span>
                     </button>
                 </div>
 
-                <!-- Middle-Outer: Left Thumbstick (left: 28%, top: 54%) -->
+                <!-- Middle-outer: Left Stick (left 28%, top 54%) -->
                 <div class="thumbstick-housing left-stick-housing" aria-label="Left Thumbstick">
                     <div class="bezel-ticks"></div>
                     <div class="stick-well" id="left-stick-zone">
@@ -63,7 +62,7 @@
                     </div>
                 </div>
 
-                <!-- Lower-Inner: Circular Recessed Dish D-Pad (right: 14px, bottom: 14px) -->
+                <!-- Lower-inner: circular-dish D-Pad (right 14px, bottom 14px) -->
                 <div class="dpad-housing" id="dpad-container" aria-label="Directional Pad">
                     <div class="dpad-dish-rim"></div>
                     <div class="dpad-cross-base">
@@ -84,11 +83,11 @@
                 </div>
             </section>
 
-            <!-- ── CENTER COLUMN ───────────────────────────────────────────── -->
-            <section class="controller-col col-center" aria-label="Center Console & System Controls">
-                <!-- Top Section: Prominent Xbox Guide Sphere + Sleek Telemetry Pill -->
+            <!-- ══ CENTER COLUMN ════════════════════════════════════════ -->
+            <section class="controller-col col-center" aria-label="Center Console">
+
+                <!-- Guide sphere + telemetry pill (8px gap) -->
                 <header class="center-top-cluster" id="hardware-notch">
-                    <!-- Prominent Circular Xbox Guide Sphere -->
                     <button class="guide-jewel" id="btn-guide" data-button="GUIDE" aria-label="Xbox Guide Button">
                         <div class="jewel-outer-ring">
                             <div class="jewel-core">
@@ -97,7 +96,6 @@
                         </div>
                     </button>
 
-                    <!-- Compact Telemetry Status Pill (8px below Guide) -->
                     <div class="notch-pill status-badge connecting" id="status-badge">
                         <span class="notch-label player-pill">P1</span>
                         <span class="notch-sep">•</span>
@@ -109,42 +107,36 @@
                     </div>
                 </header>
 
-                <!-- Middle Band (top: 52%): Inverted-Triangle System Button Cluster -->
+                <!-- Middle band (top 52%): inverted triangle View / Menu / Fullscreen -->
                 <div class="inverted-triangle-cluster">
                     <div class="triangle-top-row">
-                        <!-- Top-Left: Circular View / Back (⧉) -->
                         <button class="console-btn btn-view" id="btn-back" data-button="BACK" aria-label="View / Back">
                             <span class="console-icon">⧉</span>
                         </button>
-
-                        <!-- Top-Right: Circular Menu / Start (☰) (28px gap) -->
                         <button class="console-btn btn-menu" id="btn-start" data-button="START" aria-label="Menu / Start">
                             <span class="console-icon">☰</span>
                         </button>
                     </div>
-
-                    <!-- Bottom-Center: Rounded-Rectangle Fullscreen Button ([↑]) (12px below) -->
                     <button class="fullscreen-pill console-btn-fs" id="btn-fullscreen" aria-label="Toggle Fullscreen" title="Toggle Fullscreen">
                         <span class="fs-glyph">[↑]</span>
                     </button>
                 </div>
             </section>
 
-            <!-- ── RIGHT COLUMN ──────────────────────────────────────────── -->
-            <section class="controller-col col-right" aria-label="Right Controller Controls">
-                <!-- Top-Right Shoulder Cluster: Swept Wing RT + RB -->
+            <!-- ══ RIGHT COLUMN ═════════════════════════════════════════ -->
+            <section class="controller-col col-right" aria-label="Right Controls">
+
+                <!-- RT (swept wing) stacked above RB -->
                 <div class="shoulder-cluster right-shoulder">
                     <button class="trigger-paddle trigger-rt" id="trigger-rt" aria-label="Right Trigger">
                         <span class="paddle-label">RT</span>
-                        <span class="paddle-specular"></span>
                     </button>
                     <button class="bumper-paddle bumper-rb" id="btn-rb" data-button="RB" aria-label="Right Bumper">
                         <span class="paddle-label">RB</span>
-                        <span class="paddle-specular"></span>
                     </button>
                 </div>
 
-                <!-- Middle-Outer: Large ABXY Diamond (right: 28%, top: 54%) -->
+                <!-- Middle-outer: ABXY diamond (right 28%, top 54%) -->
                 <div class="action-diamond-housing" id="action-diamond" aria-label="Action Buttons">
                     <div class="diamond-backing-plate"></div>
                     <button class="face-btn btn-y" data-button="Y" aria-label="Button Y">
@@ -165,7 +157,7 @@
                     </button>
                 </div>
 
-                <!-- Lower-Inner: Right Thumbstick (left: 14px, bottom: 14px) -->
+                <!-- Lower-inner: Right Stick (left 14px, bottom 14px) -->
                 <div class="thumbstick-housing right-stick-housing" aria-label="Right Thumbstick">
                     <div class="bezel-ticks"></div>
                     <div class="stick-well" id="right-stick-zone">
@@ -180,7 +172,6 @@
             </section>
 
         </div>
-
     </main>
 
     <!-- Client Engine Scripts (load order: haptics → touch_engine → app) -->
