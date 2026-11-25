@@ -36,6 +36,15 @@ const BACKOFF_MIN_MS  = 500;
 const BACKOFF_MAX_MS  = 2000;
 const BACKOFF_FACTOR  = 1.6;
 
+// ─── Persisted Quick-Settings defaults ────────────────────────────────────────
+const SETTINGS_STORAGE_KEY = 'econtroller_settings_v1';
+const DEFAULT_SETTINGS = Object.freeze({
+    deadzone:    0.08,     // 8% scaled radial deadzone (0.00–0.25)
+    sensitivity: 1.0,      // 100% stick sensitivity multiplier (0.60–1.40)
+    curve:       'linear', // 'linear' | 'exponential'
+    haptics:     true,
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 class GamepadApp {
     constructor() {
@@ -82,6 +91,12 @@ class GamepadApp {
         this._prevRx = 0;
         this._prevRy = 0;
         this._flushConsecutiveFrames = 0;
+
+        // Quick-Settings & Screen Wake Lock state
+        this._settings = { ...DEFAULT_SETTINGS };
+        this._settingsOpen = false;
+        this._wakeLock = null;
+        this._wakeLockRequested = false;
     }
 
     // ─── Boot ────────────────────────────────────────────────────────────────
@@ -94,6 +109,10 @@ class GamepadApp {
 
         window.TouchEngine.init();
 
+        this._loadSettings();
+        this._applySettings();
+        this._setupSettingsDrawer();
+        this._setupWakeLock();
         this._setupFullscreen();
         this._setupGestureLocks();
         this._setupVisibilityFailsafe();   // ← Checkpoint 2
@@ -311,6 +330,9 @@ class GamepadApp {
                 this._suspend('Tab hidden');
             } else {
                 this._resume();
+                if (this._wakeLockRequested) {
+                    this._requestWakeLock();
+                }
             }
         });
 
@@ -371,6 +393,164 @@ class GamepadApp {
             } catch (_) {}
         };
         this._fullscreenBtn.addEventListener('click', toggle);
+    }
+
+    // ─── Quick-Settings Persistence & Drawer ──────────────────────────────────
+    _loadSettings() {
+        try {
+            const raw = window.localStorage?.getItem(SETTINGS_STORAGE_KEY);
+            if (!raw) return;
+            const parsed = JSON.parse(raw);
+            if (typeof parsed.deadzone === 'number' && !Number.isNaN(parsed.deadzone)) {
+                this._settings.deadzone = Math.max(0.0, Math.min(0.25, parsed.deadzone));
+            }
+            if (typeof parsed.sensitivity === 'number' && !Number.isNaN(parsed.sensitivity)) {
+                this._settings.sensitivity = Math.max(0.6, Math.min(1.4, parsed.sensitivity));
+            }
+            if (parsed.curve === 'linear' || parsed.curve === 'exponential') {
+                this._settings.curve = parsed.curve;
+            }
+            if (typeof parsed.haptics === 'boolean') {
+                this._settings.haptics = parsed.haptics;
+            }
+        } catch (_) {}
+    }
+
+    _saveSettings() {
+        try {
+            window.localStorage?.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(this._settings));
+        } catch (_) {}
+    }
+
+    _applySettings() {
+        window.TouchEngine?.applySettings({
+            deadzone:    this._settings.deadzone,
+            sensitivity: this._settings.sensitivity,
+            curve:       this._settings.curve,
+        });
+        window.Haptics?.setEnabled(this._settings.haptics);
+    }
+
+    _setupSettingsDrawer() {
+        const gearBtn    = document.getElementById('btn-settings');
+        const closeBtn   = document.getElementById('btn-settings-close');
+        const backdrop   = document.getElementById('settings-backdrop');
+        const drawer     = document.getElementById('settings-drawer');
+        const dzSlider   = document.getElementById('setting-deadzone');
+        const dzVal      = document.getElementById('val-deadzone');
+        const sensSlider = document.getElementById('setting-sensitivity');
+        const sensVal    = document.getElementById('val-sensitivity');
+        const btnLinear  = document.getElementById('btn-curve-linear');
+        const btnPrec    = document.getElementById('btn-curve-precision');
+        const hapToggle  = document.getElementById('setting-haptics');
+        const resetBtn   = document.getElementById('btn-settings-reset');
+
+        if (!gearBtn || !drawer || !backdrop) return;
+
+        const syncUI = () => {
+            const dzPct = Math.round(this._settings.deadzone * 100);
+            const sensPct = Math.round(this._settings.sensitivity * 100);
+            if (dzSlider)   dzSlider.value = String(dzPct);
+            if (dzVal)      dzVal.textContent = `${dzPct}%`;
+            if (sensSlider) sensSlider.value = String(sensPct);
+            if (sensVal)    sensVal.textContent = `${sensPct}%`;
+
+            const isExp = this._settings.curve === 'exponential';
+            if (btnLinear) {
+                btnLinear.classList.toggle('active', !isExp);
+                btnLinear.setAttribute('aria-pressed', String(!isExp));
+            }
+            if (btnPrec) {
+                btnPrec.classList.toggle('active', isExp);
+                btnPrec.setAttribute('aria-pressed', String(isExp));
+            }
+            if (hapToggle) hapToggle.checked = this._settings.haptics;
+        };
+
+        const setOpen = (open) => {
+            this._settingsOpen = Boolean(open);
+            drawer.classList.toggle('open', this._settingsOpen);
+            backdrop.classList.toggle('open', this._settingsOpen);
+            drawer.setAttribute('aria-hidden', String(!this._settingsOpen));
+            backdrop.setAttribute('aria-hidden', String(!this._settingsOpen));
+            gearBtn.setAttribute('aria-expanded', String(this._settingsOpen));
+            window.TouchEngine?.setPaused(this._settingsOpen);
+        };
+
+        syncUI();
+
+        gearBtn.addEventListener('click', () => setOpen(!this._settingsOpen));
+        closeBtn?.addEventListener('click', () => setOpen(false));
+        backdrop.addEventListener('click', () => setOpen(false));
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this._settingsOpen) setOpen(false);
+        });
+
+        dzSlider?.addEventListener('input', () => {
+            const pct = Number(dzSlider.value);
+            this._settings.deadzone = Math.max(0, Math.min(25, pct)) / 100;
+            if (dzVal) dzVal.textContent = `${Math.round(this._settings.deadzone * 100)}%`;
+            this._applySettings();
+            this._saveSettings();
+        });
+
+        sensSlider?.addEventListener('input', () => {
+            const pct = Number(sensSlider.value);
+            this._settings.sensitivity = Math.max(60, Math.min(140, pct)) / 100;
+            if (sensVal) sensVal.textContent = `${Math.round(this._settings.sensitivity * 100)}%`;
+            this._applySettings();
+            this._saveSettings();
+        });
+
+        const setCurve = (curve) => {
+            this._settings.curve = curve;
+            syncUI();
+            this._applySettings();
+            this._saveSettings();
+        };
+        btnLinear?.addEventListener('click', () => setCurve('linear'));
+        btnPrec?.addEventListener('click', () => setCurve('exponential'));
+
+        hapToggle?.addEventListener('change', () => {
+            this._settings.haptics = Boolean(hapToggle.checked);
+            this._applySettings();
+            this._saveSettings();
+        });
+
+        resetBtn?.addEventListener('click', () => {
+            this._settings = { ...DEFAULT_SETTINGS };
+            syncUI();
+            this._applySettings();
+            this._saveSettings();
+        });
+    }
+
+    // ─── Screen Wake Lock ─────────────────────────────────────────────────────
+    _setupWakeLock() {
+        const acquireOnce = () => {
+            this._wakeLockRequested = true;
+            this._requestWakeLock();
+        };
+        window.addEventListener('pointerdown', acquireOnce, { once: true, passive: true });
+        window.addEventListener('touchstart',  acquireOnce, { once: true, passive: true });
+    }
+
+    async _requestWakeLock() {
+        if (document.hidden || this._wakeLock) return;
+        if (typeof navigator === 'undefined' || !navigator.wakeLock || typeof navigator.wakeLock.request !== 'function') {
+            return;
+        }
+        try {
+            const sentinel = await navigator.wakeLock.request('screen');
+            this._wakeLock = sentinel;
+            sentinel.addEventListener('release', () => {
+                if (this._wakeLock === sentinel) {
+                    this._wakeLock = null;
+                }
+            });
+        } catch (_) {
+            // Unsupported, low-battery policy, or page not active — fail silently
+        }
     }
 
     // ─── Gesture locks (pinch-zoom, bounce scroll) ────────────────────────────

@@ -59,12 +59,35 @@ class TouchEngine {
         // ── Stick tracking ────────────────────────────────────────────────
         this._stickStates  = { left: null, right: null };
 
-        this.DEADZONE        = 0.12;   // 12% radial deadzone
-        this.MAX_STICK_PX    = 48;     // socket radius in CSS pixels
+        this.DEADZONE        = 0.08;      // configurable 0.00–0.25 scaled radial deadzone
+        this.curve           = 'linear';  // 'linear' | 'exponential'
+        this.sensitivity     = 1.0;       // configurable 0.6–1.4 multiplier
+        this.paused          = false;     // true while settings drawer is open
+        this.MAX_STICK_PX    = 48;        // fallback socket radius in CSS pixels
 
         // Face-button set eligible for thumb-roll (enter/leave while pointer down)
         this._ROLLABLE = new Set(['A', 'B', 'X', 'Y',
                                   'DPAD_UP', 'DPAD_DOWN', 'DPAD_LEFT', 'DPAD_RIGHT']);
+    }
+
+    // ── Settings & Pause Control ──────────────────────────────────────────
+    applySettings({ deadzone, sensitivity, curve } = {}) {
+        if (typeof deadzone === 'number' && !Number.isNaN(deadzone)) {
+            this.DEADZONE = Math.max(0.0, Math.min(0.25, deadzone));
+        }
+        if (typeof sensitivity === 'number' && !Number.isNaN(sensitivity)) {
+            this.sensitivity = Math.max(0.6, Math.min(1.4, sensitivity));
+        }
+        if (curve === 'linear' || curve === 'exponential') {
+            this.curve = curve;
+        }
+    }
+
+    setPaused(paused) {
+        this.paused = Boolean(paused);
+        if (this.paused) {
+            this.forceResetZeroTouch();
+        }
     }
 
     // ── Init ──────────────────────────────────────────────────────────────
@@ -107,7 +130,7 @@ class TouchEngine {
         // fast thumb drags near the screen edges into back/forward page swipes
         if (shell) {
             const blockSafariGestures = e => {
-                if (e.target && e.target.closest && e.target.closest('#btn-fullscreen, .fullscreen-pill')) {
+                if (e.target && e.target.closest && e.target.closest('#btn-fullscreen, .fullscreen-pill, #btn-settings, #settings-drawer, #settings-backdrop')) {
                     return;
                 }
                 e.preventDefault();
@@ -129,6 +152,7 @@ class TouchEngine {
 
             // pointerdown — initial press (skip capture on rollable buttons so thumb-roll works)
             el.addEventListener('pointerdown', e => {
+                if (this.paused) return;
                 e.preventDefault(); e.stopPropagation();
                 this._pressButton(e.pointerId, name, mask, el, rollable);
             }, { passive: false });
@@ -145,6 +169,7 @@ class TouchEngine {
             // Thumb-roll: pointerenter while another pointer is already moving over face buttons
             if (rollable) {
                 el.addEventListener('pointerenter', e => {
+                    if (this.paused) return;
                     // Only activate if the pointer is currently held down (buttons !== 0)
                     if (e.buttons === 0) return;
                     e.preventDefault();
@@ -241,6 +266,7 @@ class TouchEngine {
         const isLeft = side === 'lt';
 
         el.addEventListener('pointerdown', e => {
+            if (this.paused) return;
             e.preventDefault(); e.stopPropagation();
             if (this._triggerPtrs.has(side)) return;   // already held
             try { el.setPointerCapture(e.pointerId); } catch (_) {}
@@ -287,6 +313,7 @@ class TouchEngine {
         // On stick pointerdown, record activePointerId = e.pointerId and call
         // socketElement.setPointerCapture(e.pointerId) inside a try/catch
         socketElement.addEventListener('pointerdown', e => {
+            if (this.paused) return;
             e.preventDefault();
             e.stopPropagation();
             if (stickState.activePointerId !== null) return;   // second finger ignored
@@ -373,9 +400,9 @@ class TouchEngine {
 
         st.nub.style.transform = `translate(${cx.toFixed(1)}px, ${cy.toFixed(1)}px)`;
 
-        // Deadzone: map [0, maxR] → [0, 1], suppress values below DEADZONE
-        const norm = Math.min(len / maxR, 1.0);
-        if (norm < this.DEADZONE) {
+        // Scaled radial deadzone: map [DEADZONE, 1.0] → [0.0, 1.0] smoothly
+        const r = Math.min(len / maxR, 1.0);
+        if (len === 0 || r < this.DEADZONE) {
             const wasNonZero = side === 'left'
                 ? (this.lx !== 0 || this.ly !== 0)
                 : (this.rx !== 0 || this.ry !== 0);
@@ -389,13 +416,17 @@ class TouchEngine {
             return;
         }
 
-        // Smooth linear rescale past deadzone
-        const mag   = (norm - this.DEADZONE) / (1.0 - this.DEADZONE);
-        const angle = Math.atan2(dy, dx);
+        const m = this.DEADZONE < 1.0 ? (r - this.DEADZONE) / (1.0 - this.DEADZONE) : 0;
+        const curved = this.curve === 'exponential' ? Math.pow(m, 1.65) : m;
+        const angle  = Math.atan2(dy, dx);
 
-        // Clamp to signed 16-bit range; invert Y so "up" is positive
-        const ix = Math.round(Math.cos(angle) * mag * 32767);
-        const iy = Math.round(-Math.sin(angle) * mag * 32767);
+        // Apply sensitivity multiplier and clamp normalized axes to [-1.0, 1.0]; invert Y so "up" is positive
+        const nx = Math.max(-1.0, Math.min(1.0,  Math.cos(angle) * curved * this.sensitivity));
+        const ny = Math.max(-1.0, Math.min(1.0, -Math.sin(angle) * curved * this.sensitivity));
+
+        // Convert to signed 16-bit range [-32768, 32767]
+        const ix = Math.round(nx * 32767);
+        const iy = Math.round(ny * 32767);
 
         if (side === 'left') {
             this.lx = Math.max(-32768, Math.min(32767, ix));
@@ -409,7 +440,7 @@ class TouchEngine {
     // ── Zero-Touch Failsafe (iOS Safari gesture recovery) ───────────────────
     _bindZeroTouchFailsafe() {
         const onZeroTouch = e => {
-            if (e.touches && e.touches.length === 0) {
+            if (!this.paused && e.touches && e.touches.length === 0) {
                 this.forceResetZeroTouch();
             }
         };

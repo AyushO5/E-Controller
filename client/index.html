@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 
-    <!-- True Fullscreen iOS PWA Support -->
+    <!-- True Fullscreen iOS / Android PWA Support -->
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Gamepad">
     <meta name="theme-color" content="#0A0C10">
@@ -95,14 +96,19 @@
                         </div>
                     </button>
 
-                    <div class="notch-pill status-badge connecting" id="status-badge">
-                        <span class="notch-label player-pill">P1</span>
-                        <span class="notch-sep">•</span>
-                        <span class="status-dot"></span>
-                        <span class="status-text">Connecting...</span>
-                        <span class="notch-sep">•</span>
-                        <span class="latency-value" id="latency-badge">-- ms</span>
-                        <span class="driver-tag" id="driver-badge" style="display:none;">Xbox 360</span>
+                    <div class="telemetry-row">
+                        <div class="notch-pill status-badge connecting" id="status-badge">
+                            <span class="notch-label player-pill">P1</span>
+                            <span class="notch-sep">•</span>
+                            <span class="status-dot"></span>
+                            <span class="status-text">Connecting...</span>
+                            <span class="notch-sep">•</span>
+                            <span class="latency-value" id="latency-badge">-- ms</span>
+                            <span class="driver-tag" id="driver-badge" style="display:none;">Xbox 360</span>
+                        </div>
+                        <button class="settings-gear-btn" id="btn-settings" type="button" aria-label="Open Settings" title="Quick Settings" aria-controls="settings-drawer" aria-expanded="false">
+                            <span class="settings-gear-glyph" aria-hidden="true">⚙</span>
+                        </button>
                     </div>
                 </header>
 
@@ -171,6 +177,60 @@
             </section>
 
         </div>
+
+        <!-- Quick-Settings Slide-Over Drawer -->
+        <div class="settings-backdrop" id="settings-backdrop" aria-hidden="true"></div>
+        <aside class="settings-drawer" id="settings-drawer" role="dialog" aria-modal="true" aria-labelledby="settings-title" aria-hidden="true">
+            <div class="settings-header">
+                <h2 class="settings-title" id="settings-title">QUICK SETTINGS</h2>
+                <button class="settings-close-btn" id="btn-settings-close" type="button" aria-label="Close Settings">✕</button>
+            </div>
+
+            <div class="settings-body">
+                <!-- Deadzone Slider (0% - 25%, default 8%) -->
+                <div class="setting-group">
+                    <div class="setting-label-row">
+                        <label class="setting-label" for="setting-deadzone">Deadzone</label>
+                        <span class="setting-value" id="val-deadzone">8%</span>
+                    </div>
+                    <input class="setting-slider" id="setting-deadzone" type="range" min="0" max="25" step="1" value="8">
+                </div>
+
+                <!-- Stick Sensitivity Slider (60% - 140%, default 100%) -->
+                <div class="setting-group">
+                    <div class="setting-label-row">
+                        <label class="setting-label" for="setting-sensitivity">Stick Sensitivity</label>
+                        <span class="setting-value" id="val-sensitivity">100%</span>
+                    </div>
+                    <input class="setting-slider" id="setting-sensitivity" type="range" min="60" max="140" step="5" value="100">
+                </div>
+
+                <!-- Response Curve Toggle (Linear vs. Precision) -->
+                <div class="setting-group">
+                    <div class="setting-label-row">
+                        <span class="setting-label">Response Curve</span>
+                    </div>
+                    <div class="segmented-toggle" role="group" aria-label="Response Curve">
+                        <button class="seg-btn active" id="btn-curve-linear" type="button" data-curve="linear" aria-pressed="true">Linear</button>
+                        <button class="seg-btn" id="btn-curve-precision" type="button" data-curve="exponential" aria-pressed="false">Precision</button>
+                    </div>
+                </div>
+
+                <!-- Haptic Feedback Toggle -->
+                <div class="setting-group setting-row-inline">
+                    <label class="setting-label" for="setting-haptics">Haptic Feedback</label>
+                    <label class="toggle-switch">
+                        <input id="setting-haptics" type="checkbox" checked>
+                        <span class="toggle-track" aria-hidden="true"></span>
+                    </label>
+                </div>
+
+                <!-- Reset to Defaults -->
+                <div class="settings-footer">
+                    <button class="settings-reset-btn" id="btn-settings-reset" type="button">Reset to Defaults</button>
+                </div>
+            </div>
+        </aside>
     </main>
 
     <!-- Client Engine Scripts (load order: haptics → touch_engine → app) -->

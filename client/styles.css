@@ -258,6 +258,50 @@ button {
     text-shadow: 0 0 8px var(--volt-yellow) !important;
 }
 
+/* Telemetry row: [P1] • Connected • ms + compact settings gear */
+.telemetry-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    max-width: 100%;
+}
+
+.settings-gear-btn {
+    position: relative;
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    border-radius: 7px;
+    background: linear-gradient(180deg, #161B26 0%, #0D1017 100%);
+    border: 1px solid var(--border-control);
+    color: var(--text-slate);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    transition: transform 0.08s ease, border-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+.settings-gear-btn::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+}
+.settings-gear-glyph {
+    font-size: 13px;
+    line-height: 1;
+    pointer-events: none;
+}
+.settings-gear-btn:hover,
+.settings-gear-btn[aria-expanded="true"],
+.settings-gear-btn:active {
+    border-color: var(--volt-yellow);
+    color: var(--volt-yellow);
+    background: var(--volt-fill);
+    box-shadow: 0 0 10px var(--volt-glow);
+}
+
 /* Telemetry pill: [P1] • Connected • ms */
 .notch-pill {
     display: flex;
@@ -699,4 +743,251 @@ button {
 
 @media (orientation: portrait) {
     .portrait-warning { display: flex; }
+}
+
+/* ── 10. Quick-Settings Slide-Over Drawer ───────────────────────────────── */
+.settings-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 7, 11, 0.65);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 200;
+    touch-action: auto !important;
+}
+.settings-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.settings-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(300px, 82vw);
+    background: #101319;
+    border-left: 1px solid rgba(250, 204, 21, 0.24);
+    box-shadow: -12px 0 36px rgba(0, 0, 0, 0.78);
+    display: flex;
+    flex-direction: column;
+    padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right))
+             max(12px, env(safe-area-inset-bottom)) 16px;
+    transform: translateX(100%);
+    transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+    z-index: 210;
+    overflow-y: auto;
+    touch-action: pan-y !important;
+}
+.settings-drawer.open {
+    transform: translateX(0);
+}
+.settings-drawer *,
+.settings-drawer button,
+.settings-drawer input,
+.settings-drawer label {
+    touch-action: auto !important;
+}
+
+.settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--border-control);
+}
+.settings-title {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 1.4px;
+    color: var(--volt-yellow);
+}
+.settings-close-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: var(--control-surface);
+    border: 1px solid var(--border-control);
+    color: var(--text-slate);
+    font-size: 13px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+.settings-close-btn:hover,
+.settings-close-btn:active {
+    border-color: var(--volt-yellow);
+    color: var(--volt-yellow);
+    background: var(--volt-fill);
+}
+
+.settings-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    flex: 1;
+}
+.setting-group {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+.setting-row-inline {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    border-radius: 9px;
+    background: var(--control-surface);
+    border: 1px solid var(--border-control);
+}
+.setting-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.setting-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    color: var(--text-white);
+}
+.setting-value {
+    font-size: 11px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: var(--volt-yellow);
+}
+
+.setting-slider {
+    width: 100%;
+    height: 6px;
+    border-radius: 999px;
+    background: #1C2230;
+    outline: none;
+    cursor: pointer;
+    accent-color: var(--volt-yellow);
+    -webkit-appearance: none;
+    appearance: none;
+    touch-action: pan-x !important;
+}
+.setting-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--volt-yellow);
+    border: 2px solid #0A0C10;
+    box-shadow: 0 0 10px var(--volt-glow);
+    cursor: pointer;
+}
+.setting-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--volt-yellow);
+    border: 2px solid #0A0C10;
+    box-shadow: 0 0 10px var(--volt-glow);
+    cursor: pointer;
+}
+
+.segmented-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    padding: 4px;
+    border-radius: 9px;
+    background: var(--control-surface);
+    border: 1px solid var(--border-control);
+}
+.seg-btn {
+    height: 30px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-slate);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+}
+.seg-btn.active {
+    background: var(--volt-fill);
+    border-color: var(--volt-yellow);
+    color: var(--volt-yellow);
+    box-shadow: 0 0 10px rgba(250, 204, 21, 0.25);
+}
+
+.toggle-switch {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+}
+.toggle-switch input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.toggle-track {
+    width: 40px;
+    height: 22px;
+    border-radius: 999px;
+    background: #232A3A;
+    border: 1px solid var(--border-control-hi);
+    position: relative;
+    transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.toggle-track::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--text-slate);
+    transition: transform 0.16s ease, background 0.16s ease;
+}
+.toggle-switch input:checked + .toggle-track {
+    background: var(--volt-fill);
+    border-color: var(--volt-yellow);
+    box-shadow: 0 0 10px rgba(250, 204, 21, 0.3);
+}
+.toggle-switch input:checked + .toggle-track::after {
+    transform: translateX(18px);
+    background: var(--volt-yellow);
+}
+
+.settings-footer {
+    margin-top: auto;
+    padding-top: 8px;
+}
+.settings-reset-btn {
+    width: 100%;
+    height: 34px;
+    border-radius: 9px;
+    background: var(--control-surface);
+    border: 1px solid var(--border-control-hi);
+    color: var(--text-slate);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    cursor: pointer;
+    transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+.settings-reset-btn:hover,
+.settings-reset-btn:active {
+    border-color: var(--volt-yellow);
+    color: var(--volt-yellow);
+    background: var(--volt-fill);
 }
