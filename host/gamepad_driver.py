@@ -135,7 +135,7 @@ class LinuxUInputGamepad(BaseGamepadDriver):
     Never grabs the device exclusively so games and OS testers read it cleanly.
     """
 
-    def __init__(self):
+    def __init__(self, defer_init: bool = False):
         super().__init__()
         import evdev
         from evdev import AbsInfo, ecodes
@@ -146,6 +146,7 @@ class LinuxUInputGamepad(BaseGamepadDriver):
         self.has_rumble = False
         self._rumble_task: Optional[asyncio.Task] = None
         self._rumble_running = False
+        self.device_name = "Linux uinput: Microsoft X-Box 360 pad"
 
         self.button_map: Dict[int, int] = {
             ButtonMask.A:          ecodes.BTN_SOUTH,
@@ -165,7 +166,8 @@ class LinuxUInputGamepad(BaseGamepadDriver):
             ButtonMask.DPAD_RIGHT: ecodes.BTN_DPAD_RIGHT,
         }
 
-        self._init_device()
+        if not defer_init:
+            self._init_device()
 
     def _init_device(self):
         """Initialize uinput with FF_RUMBLE fallback to standard Xbox 360 pad."""
@@ -333,7 +335,7 @@ class LinuxUInputGamepad(BaseGamepadDriver):
 class WindowsVGamepad(BaseGamepadDriver):
     """Windows ViGEmBus virtual Xbox 360 controller with rumble notification."""
 
-    def __init__(self):
+    def __init__(self, defer_init: bool = False):
         super().__init__()
         import vgamepad as vg
         self.vg = vg
@@ -358,7 +360,8 @@ class WindowsVGamepad(BaseGamepadDriver):
             ButtonMask.DPAD_RIGHT: vg.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_RIGHT,
         }
 
-        self._init_gamepad()
+        if not defer_init:
+            self._init_gamepad()
 
     def _init_gamepad(self):
         self.gamepad = self.vg.VX360Gamepad()
@@ -418,7 +421,7 @@ class WindowsVGamepad(BaseGamepadDriver):
 # ---------------------------------------------------------------------------
 # Factory
 # ---------------------------------------------------------------------------
-def create_gamepad_driver(force_mock: bool = False) -> BaseGamepadDriver:
+def create_gamepad_driver(force_mock: bool = False, defer_init: bool = False) -> BaseGamepadDriver:
     if force_mock:
         return MockGamepadDriver("--mock flag")
 
@@ -426,7 +429,7 @@ def create_gamepad_driver(force_mock: bool = False) -> BaseGamepadDriver:
 
     if os_name == "Linux":
         try:
-            return LinuxUInputGamepad()
+            return LinuxUInputGamepad(defer_init=defer_init)
         except PermissionError:
             print("\n" + "=" * 68)
             print("[WARNING] /dev/uinput not writable. Add a persistent udev rule:")
@@ -443,7 +446,7 @@ def create_gamepad_driver(force_mock: bool = False) -> BaseGamepadDriver:
 
     elif os_name == "Windows":
         try:
-            return WindowsVGamepad()
+            return WindowsVGamepad(defer_init=defer_init)
         except ImportError:
             print("\n" + "=" * 68)
             print("[WARNING] vgamepad / ViGEmBus not found. To install:")
