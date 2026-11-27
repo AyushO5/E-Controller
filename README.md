@@ -4,7 +4,6 @@
 
 E-Controller streams mobile multi-touch inputs from any modern web browser to your PC over local Wi-Fi using an ultra-compact **16-byte binary WebSocket protocol**. The lightweight Python daemon intercepts these packets and injects native OS-level Xbox 360 controller events via **ViGEmBus** on Windows or **uinput** on Linux, making it instantly compatible with Steam and all PC games.
 
-> **[🎥 Insert 15-second split-screen demo GIF or screenshot here]**
 
 ---
 
