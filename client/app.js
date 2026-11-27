@@ -43,6 +43,11 @@ const DEFAULT_SETTINGS = Object.freeze({
     sensitivity: 1.0,      // 100% stick sensitivity multiplier (0.60–1.40)
     curve:       'linear', // 'linear' | 'exponential'
     haptics:     true,
+    gyroMode:         'off',      // 'off' | 'right_stick' | 'left_stick_x'
+    gyroActivation:   'hold_lt',  // 'hold_lt' | 'hold_clutch' | 'always_on'
+    gyroSensitivity:  1.2,        // 0.5 – 3.0
+    gyroAntiDeadzone: 0.14,       // 0.00 – 0.25
+    gyroInvertY:      false,
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -97,6 +102,12 @@ class GamepadApp {
         this._settingsOpen = false;
         this._wakeLock = null;
         this._wakeLockRequested = false;
+
+        // Gyro HUD state
+        this._gyroPill = null;
+        this._gyroPillActive = false;
+        this._gyroClutchBtn = null;
+        this._gyroWarningEl = null;
     }
 
     // ─── Boot ────────────────────────────────────────────────────────────────
@@ -107,10 +118,16 @@ class GamepadApp {
         this._playerEl      = document.querySelector('.player-pill');
         this._fullscreenBtn = document.getElementById('btn-fullscreen');
 
+        this._gyroPill      = document.getElementById('gyro-status-pill');
+        this._gyroClutchBtn = document.getElementById('btn-gyro-clutch');
+        this._gyroWarningEl = document.getElementById('gyro-sensor-warning');
+
         window.TouchEngine.init();
+        window.GyroEngine?.init({ onWarningChange: (msg) => this._setGyroWarning(msg) });
 
         this._loadSettings();
         this._applySettings();
+        window.GyroEngine?.resumeIfEnabled();
         this._setupSettingsDrawer();
         this._setupWakeLock();
         this._setupFullscreen();
@@ -135,8 +152,10 @@ class GamepadApp {
     _wsUrl() {
         const p = new URLSearchParams(window.location.search);
         if (p.has('ws')) return p.get('ws');
-        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        return `${proto}//${location.hostname || '127.0.0.1'}:${p.get('port') || '8765'}`;
+        const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.hostname || '127.0.0.1';
+        const port = p.get('port') || window.location.port || '8765';
+        return `${wsProto}//${host}:${port}`;
     }
 
     _connect() {
@@ -155,7 +174,36 @@ class GamepadApp {
             this.socket.onclose = () => this._onClose();
             this.socket.onerror = () => this.socket?.close();
         } catch (_) {
+            this._resetGyro();
             this._scheduleReconnect();
+        }
+    }
+
+    // ─── Gyro helpers ─────────────────────────────────────────────────────────
+    _resetGyro() {
+        window.GyroEngine?.resetOutput();
+        this._setGyroPillActive(false);
+    }
+
+    _setGyroPillActive(on) {
+        if (on === this._gyroPillActive) return;
+        this._gyroPillActive = on;
+        this._gyroPill?.classList.toggle('active', on);
+    }
+
+    _setGyroWarning(msg) {
+        const el = this._gyroWarningEl;
+        if (!el) return;
+        el.textContent = msg || '';
+        el.hidden = !msg;
+    }
+
+    _syncGyroHUD() {
+        const s = this._settings;
+        const on = s.gyroMode !== 'off';
+        this._gyroPill?.classList.toggle('armed', on);
+        if (this._gyroClutchBtn) {
+            this._gyroClutchBtn.hidden = !(on && s.gyroActivation === 'hold_clutch');
         }
     }
 
@@ -171,6 +219,7 @@ class GamepadApp {
 
     _onClose() {
         this._stopPing();
+        this._resetGyro();
         // Don't override SUSPENDED — it handles its own reconnect path
         if (this._state !== State.SUSPENDED) {
             this._setState(State.RECONNECTING, 'Reconnecting…');
@@ -282,7 +331,10 @@ class GamepadApp {
         if (this._state === State.SUSPENDED) return;   // neutral already sent
         if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
 
-        const inp  = window.TouchEngine.getState();
+        const te = window.TouchEngine;
+        const gyroOut = window.GyroEngine ? window.GyroEngine.sample(te.lt / 255) : null;
+        this._setGyroPillActive(Boolean(gyroOut && gyroOut.sending));
+        const inp  = te.getBlendedState(gyroOut);
 
         // Detect transition from non-zero to (0, 0) on either stick
         const leftReturnedToCenter  = (this._prevLx !== 0 || this._prevLy !== 0) && (inp.lx === 0 && inp.ly === 0);
@@ -351,6 +403,7 @@ class GamepadApp {
         this._prevLy = 0;
         this._prevRx = 0;
         this._prevRy = 0;
+        this._resetGyro();
         window.TouchEngine?.releaseAll();   // clear all held buttons/sticks
         this._sendNeutralFrame();   // zero all axes/buttons on host immediately
     }
@@ -413,6 +466,21 @@ class GamepadApp {
             if (typeof parsed.haptics === 'boolean') {
                 this._settings.haptics = parsed.haptics;
             }
+            if (['off', 'right_stick', 'left_stick_x'].includes(parsed.gyroMode)) {
+                this._settings.gyroMode = parsed.gyroMode;
+            }
+            if (['hold_lt', 'hold_clutch', 'always_on'].includes(parsed.gyroActivation)) {
+                this._settings.gyroActivation = parsed.gyroActivation;
+            }
+            if (typeof parsed.gyroSensitivity === 'number' && Number.isFinite(parsed.gyroSensitivity)) {
+                this._settings.gyroSensitivity = Math.max(0.5, Math.min(3.0, parsed.gyroSensitivity));
+            }
+            if (typeof parsed.gyroAntiDeadzone === 'number' && Number.isFinite(parsed.gyroAntiDeadzone)) {
+                this._settings.gyroAntiDeadzone = Math.max(0.0, Math.min(0.25, parsed.gyroAntiDeadzone));
+            }
+            if (typeof parsed.gyroInvertY === 'boolean') {
+                this._settings.gyroInvertY = parsed.gyroInvertY;
+            }
         } catch (_) {}
     }
 
@@ -429,6 +497,14 @@ class GamepadApp {
             curve:       this._settings.curve,
         });
         window.Haptics?.setEnabled(this._settings.haptics);
+        window.GyroEngine?.applySettings({
+            mode:         this._settings.gyroMode,
+            activation:   this._settings.gyroActivation,
+            sensitivity:  this._settings.gyroSensitivity,
+            antiDeadzone: this._settings.gyroAntiDeadzone,
+            invertY:      this._settings.gyroInvertY,
+        });
+        this._syncGyroHUD();
     }
 
     _setupSettingsDrawer() {
@@ -444,6 +520,14 @@ class GamepadApp {
         const btnPrec    = document.getElementById('btn-curve-precision');
         const hapToggle  = document.getElementById('setting-haptics');
         const resetBtn   = document.getElementById('btn-settings-reset');
+        const gModeBtns  = document.querySelectorAll('[data-gyro-mode]');
+        const gActBtns   = document.querySelectorAll('[data-gyro-act]');
+        const gSens      = document.getElementById('setting-gyro-sens');
+        const gSensVal   = document.getElementById('val-gyro-sens');
+        const gAdz       = document.getElementById('setting-gyro-antidz');
+        const gAdzVal    = document.getElementById('val-gyro-antidz');
+        const gInvert    = document.getElementById('setting-gyro-inverty');
+        const gCalib     = document.getElementById('btn-gyro-calibrate');
 
         if (!gearBtn || !drawer || !backdrop) return;
 
@@ -465,6 +549,23 @@ class GamepadApp {
                 btnPrec.setAttribute('aria-pressed', String(isExp));
             }
             if (hapToggle) hapToggle.checked = this._settings.haptics;
+
+            gModeBtns.forEach((b) => {
+                const on = b.dataset.gyroMode === this._settings.gyroMode;
+                b.classList.toggle('active', on);
+                b.setAttribute('aria-pressed', String(on));
+            });
+            gActBtns.forEach((b) => {
+                const on = b.dataset.gyroAct === this._settings.gyroActivation;
+                b.classList.toggle('active', on);
+                b.setAttribute('aria-pressed', String(on));
+            });
+            if (gSens)    gSens.value = String(this._settings.gyroSensitivity);
+            if (gSensVal) gSensVal.textContent = `${this._settings.gyroSensitivity.toFixed(1)}x`;
+            const adzPct = Math.round(this._settings.gyroAntiDeadzone * 100);
+            if (gAdz)     gAdz.value = String(adzPct);
+            if (gAdzVal)  gAdzVal.textContent = `${adzPct}%`;
+            if (gInvert)  gInvert.checked = this._settings.gyroInvertY;
         };
 
         const setOpen = (open) => {
@@ -475,6 +576,8 @@ class GamepadApp {
             backdrop.setAttribute('aria-hidden', String(!this._settingsOpen));
             gearBtn.setAttribute('aria-expanded', String(this._settingsOpen));
             window.TouchEngine?.setPaused(this._settingsOpen);
+            window.GyroEngine?.setPaused(this._settingsOpen);
+            if (this._settingsOpen) this._setGyroPillActive(false);
         };
 
         syncUI();
@@ -517,8 +620,63 @@ class GamepadApp {
             this._saveSettings();
         });
 
+        // ── Gyro controls ──
+        gModeBtns.forEach((btn) => btn.addEventListener('click', () => {
+            const mode = btn.dataset.gyroMode;
+            this._settings.gyroMode = mode;
+            this._applySettings();
+            if (mode !== 'off') {
+                // Synchronous inside the tap handler: required for iOS permission prompts
+                window.GyroEngine?.enableFromUserGesture(mode);
+            } else {
+                window.GyroEngine?.clearWarning();
+                this._resetGyro();
+            }
+            syncUI();
+            this._saveSettings();
+        }));
+
+        gActBtns.forEach((btn) => btn.addEventListener('click', () => {
+            this._settings.gyroActivation = btn.dataset.gyroAct;
+            this._applySettings();
+            syncUI();
+            this._saveSettings();
+        }));
+
+        gSens?.addEventListener('input', () => {
+            this._settings.gyroSensitivity = Math.max(0.5, Math.min(3.0, Number(gSens.value)));
+            if (gSensVal) gSensVal.textContent = `${this._settings.gyroSensitivity.toFixed(1)}x`;
+            this._applySettings();
+            this._saveSettings();
+        });
+
+        gAdz?.addEventListener('input', () => {
+            this._settings.gyroAntiDeadzone = Math.max(0, Math.min(25, Number(gAdz.value))) / 100;
+            if (gAdzVal) gAdzVal.textContent = `${Math.round(this._settings.gyroAntiDeadzone * 100)}%`;
+            this._applySettings();
+            this._saveSettings();
+        });
+
+        gInvert?.addEventListener('change', () => {
+            this._settings.gyroInvertY = Boolean(gInvert.checked);
+            this._applySettings();
+            this._saveSettings();
+        });
+
+        gCalib?.addEventListener('click', () => {
+            window.GyroEngine?.recalibrate();
+            gCalib.classList.add('calibrated');
+            gCalib.textContent = 'Calibrated ✓';
+            setTimeout(() => {
+                gCalib.classList.remove('calibrated');
+                gCalib.textContent = 'Recenter / Calibrate';
+            }, 1200);
+        });
+
         resetBtn?.addEventListener('click', () => {
             this._settings = { ...DEFAULT_SETTINGS };
+            window.GyroEngine?.clearWarning();
+            this._resetGyro();
             syncUI();
             this._applySettings();
             this._saveSettings();

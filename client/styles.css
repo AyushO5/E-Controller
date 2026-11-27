@@ -263,8 +263,88 @@ button {
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-wrap: wrap;
+    row-gap: 4px;
     gap: 6px;
     max-width: 100%;
+}
+
+/* GYRO HUD status pill */
+.gyro-hud-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    height: 24px;
+    padding: 2px 7px;
+    border-radius: 7px;
+    background: linear-gradient(180deg, #131720 0%, #090B0F 100%);
+    border: 1px solid var(--border-control);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    color: var(--text-dark);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+    transition: border-color 0.1s ease, background 0.1s ease, color 0.1s ease, box-shadow 0.1s ease;
+}
+.gyro-pill-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--text-dark);
+    transition: background 0.1s ease, box-shadow 0.1s ease;
+}
+.gyro-hud-pill.armed {
+    border-color: rgba(250, 204, 21, 0.28);
+    color: var(--text-slate);
+}
+.gyro-hud-pill.active {
+    border-color: var(--volt-yellow);
+    background: var(--volt-fill);
+    color: var(--volt-yellow);
+    box-shadow: 0 0 12px var(--volt-glow);
+}
+.gyro-hud-pill.active .gyro-pill-dot {
+    background: var(--volt-yellow);
+    box-shadow: 0 0 6px var(--volt-yellow);
+}
+
+/* GYRO clutch hold button (center console) */
+.gyro-clutch-btn {
+    position: absolute;
+    bottom: max(18px, env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    width: clamp(96px, 16vw, 128px);
+    height: clamp(38px, 10vh, 46px);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    background: linear-gradient(180deg, var(--control-surface-hi) 0%, var(--control-surface) 100%);
+    border: 1px solid rgba(250, 204, 21, 0.28);
+    color: var(--text-slate);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1.2px;
+    cursor: pointer;
+    z-index: 20;
+    box-shadow: inset 0 1px 0 var(--inner-specular),
+                inset 0 -2px 0 rgba(0, 0, 0, 0.55),
+                0 3px 10px rgba(0, 0, 0, 0.5);
+    transition: transform 0.05s ease, box-shadow 0.05s ease, border-color 0.05s ease, background 0.05s ease, color 0.05s ease;
+}
+.gyro-clutch-btn[hidden] { display: none !important; }
+.gyro-clutch-btn::after { content: ''; position: absolute; inset: -6px; border-radius: 16px; }
+.clutch-reticle { font-size: 15px; line-height: 1; pointer-events: none; }
+.clutch-label { pointer-events: none; }
+.gyro-clutch-btn.active {
+    transform: translateX(-50%) scale(0.96) translateY(1px) !important;
+    border-color: var(--volt-yellow) !important;
+    background: var(--volt-fill) !important;
+    color: var(--volt-yellow) !important;
+    box-shadow: 0 0 16px var(--volt-glow), inset 0 0 8px rgba(250, 204, 21, 0.3) !important;
 }
 
 .settings-gear-btn {
@@ -709,6 +789,7 @@ button {
         --face-btn-dim: 50px;
     }
     .action-diamond-housing { right: 30%; top: 55%; }
+    .gyro-clutch-btn { height: 34px; bottom: 12px; }
 }
 
 /* ── 9. Portrait warning ────────────────────────────────────────────────── */
@@ -768,7 +849,9 @@ button {
     top: 0;
     right: 0;
     bottom: 0;
-    width: min(300px, 82vw);
+    width: min(336px, 86vw);
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
     background: #101319;
     border-left: 1px solid rgba(250, 204, 21, 0.24);
     box-shadow: -12px 0 36px rgba(0, 0, 0, 0.78);
@@ -987,6 +1070,58 @@ button {
 }
 .settings-reset-btn:hover,
 .settings-reset-btn:active {
+    border-color: var(--volt-yellow);
+    color: var(--volt-yellow);
+    background: var(--volt-fill);
+}
+
+
+/* -- 11. Gyro / Motion settings ------------------------------------------- */
+.settings-section-divider {
+    margin-top: 4px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(250, 204, 21, 0.24);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1.4px;
+    color: var(--volt-yellow);
+}
+.segmented-toggle.seg-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+}
+.segmented-toggle.seg-3 .seg-btn {
+    height: 34px;
+    padding: 2px 4px;
+    font-size: 10px;
+    line-height: 1.15;
+}
+.gyro-warning-banner {
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.45);
+    color: #FDE68A;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 10.5px;
+    line-height: 1.35;
+}
+.gyro-warning-banner[hidden] { display: none !important; }
+.settings-action-btn {
+    width: 100%;
+    height: 34px;
+    border-radius: 9px;
+    background: var(--control-surface);
+    border: 1px solid rgba(250, 204, 21, 0.28);
+    color: var(--text-white);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    cursor: pointer;
+    transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+.settings-action-btn:hover,
+.settings-action-btn:active,
+.settings-action-btn.calibrated {
     border-color: var(--volt-yellow);
     color: var(--volt-yellow);
     background: var(--volt-fill);

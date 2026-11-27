@@ -22,7 +22,8 @@ from typing import List, Optional, Tuple
 import qrcode
 
 from gamepad_driver import create_gamepad_driver
-from server import ControllerServer
+from server import ControllerServer, build_static_process_request
+from tls_certs import build_ssl_context, ensure_lan_certificate
 
 VIGEM_URL = "https://github.com/nefarius/ViGEmBus/releases"
 UDEV_RULE_CMD = (
@@ -264,23 +265,21 @@ def _port_in_use_box(label: str, port: int, flag: str, exc: Exception) -> None:
     ])
 
 
-def verify_ports_preflight(bind_host: str, http_port: int, ws_port: int) -> None:
-    if http_port == ws_port:
-        _print_error_box("HTTP and WebSocket ports must differ", [
-            f"Both are set to {http_port}. Use --http-port and --ws-port to pick different ports.",
-        ])
-        sys.exit(1)
+def verify_ports_preflight(bind_host: str, port: int, ws_port: Optional[int] = None) -> None:
+    ports = [("Unified HTTP/WS", port, "--port")]
+    if ws_port is not None and ws_port != port:
+        ports = [("HTTP", port, "--http-port"), ("WebSocket", ws_port, "--ws-port")]
 
-    for label, port, flag in (("HTTP", http_port, "--http-port"), ("WebSocket", ws_port, "--ws-port")):
+    for label, p, flag in ports:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             if hasattr(socket, "SO_EXCLUSIVEADDRUSE") and sys.platform == "win32":
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
             elif sys.platform != "win32":
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            s.bind((bind_host, port))
+            s.bind((bind_host, p))
         except OSError as exc:
-            _port_in_use_box(label, port, flag, exc)
+            _port_in_use_box(label, p, flag, exc)
             sys.exit(1)
         finally:
             s.close()
@@ -289,12 +288,15 @@ def verify_ports_preflight(bind_host: str, http_port: int, ws_port: int) -> None
 # ---------------------------------------------------------------------------
 # 4. Startup banner
 # ---------------------------------------------------------------------------
-def print_banner(lan_ip: str, http_port: int, ws_port: int, driver_name: str, is_mock: bool,
-                 driver_label: str = "", lan_ok: Optional[bool] = None):
-    """Render terminal dashboard with pre-flight summary and QR code."""
-    query = f"?port={ws_port}" if ws_port != 8765 else ""
-    url = f"http://{lan_ip}:{http_port}{query}"
-    ws_url = f"ws://{lan_ip}:{ws_port}"
+def print_banner(lan_ip: str, port: int, driver_name: str, is_mock: bool,
+                 driver_label: str = "", lan_ok: Optional[bool] = None,
+                 use_https: bool = False, cert_path: Optional[Path] = None):
+    """Render terminal dashboard with pre-flight summary and single unified URL + QR code."""
+    http_scheme = "https" if use_https else "http"
+    ws_scheme = "wss" if use_https else "ws"
+    url = f"{http_scheme}://{lan_ip}:{port}"
+    ws_url = f"{ws_scheme}://{lan_ip}:{port}"
+    proto_summary = f"{http_scheme.upper()} + {ws_scheme.upper()}"
 
     print("\n" + "═" * 68)
     print("   🎮  VIRTUAL GAMEPAD - MOBILE TO PC HOST DAEMON  🎮")
@@ -305,17 +307,22 @@ def print_banner(lan_ip: str, http_port: int, ws_port: int, driver_name: str, is
         print("       (Run with `sudo chmod 666 /dev/uinput` for native OS gamepad)")
     else:
         print("    └─ [NATIVE MODE] Active OS-level virtual Xbox 360 controller.")
-    print(f"  • HTTP Server    : {url}")
-    print(f"  • WebSocket URL  : {ws_url}")
+    print(f"  • Unified URL    : {url}")
+    print(f"  • WebSocket      : {ws_url}  (same port)")
     print("─" * 68)
 
     # Compact pre-flight summary right above the QR code
     if driver_label:
         print(f"  [OK] Driver:  {driver_label}")
     if lan_ok is None or lan_ok:
-        print(f"  [OK] Network: {lan_ip} — HTTP :{http_port} | WS :{ws_port}")
+        print(f"  [OK] Network: {lan_ip}:{port} ({proto_summary} unified single-port)")
     else:
         print(f"  [WARN] Network: {lan_ip} — No active Wi-Fi/LAN IP found! Connect to Wi-Fi before scanning.")
+    if use_https:
+        print("  [OK] TLS: self-signed certificate — accept the browser warning once on connect")
+        print("       (Safari: Show Details → visit this website) to unlock UI + WSS + Gyro.")
+        if cert_path:
+            print(f"       Certificate: {cert_path}")
     if sys.platform == "win32":
         print("  Tip: If your phone times out, allow Python through Windows Firewall on both Private & Public networks.")
     print("─" * 68)
@@ -337,12 +344,20 @@ def print_banner(lan_ip: str, http_port: int, ws_port: int, driver_name: str, is
 
 async def async_main():
     parser = argparse.ArgumentParser(description="Phone-to-PC Virtual Gamepad Host Daemon")
-    parser.add_argument("--http-port", type=int, default=8080, help="HTTP static server port (default: 8080)")
-    parser.add_argument("--ws-port", type=int, default=8765, help="WebSocket server port (default: 8765)")
+    parser.add_argument("-p", "--port", type=int, default=None,
+                        help="Unified HTTP + WebSocket port (default: 8765)")
+    parser.add_argument("--ws-port", type=int, default=None,
+                        help="Alias for --port (default: 8765)")
+    parser.add_argument("--http-port", type=int, default=None,
+                        help="Legacy alias for --port in unified single-port mode")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="Binding host IP (default: 0.0.0.0)")
     parser.add_argument("--ip", type=str, default="", help="Override advertised LAN IP for QR code")
     parser.add_argument("--mock", action="store_true", help="Force Mock Gamepad driver (console logging)")
+    parser.add_argument("--https", action="store_true",
+                        help="Enable HTTPS and WSS using an auto-generated self-signed LAN certificate")
     args = parser.parse_args()
+
+    port = args.port or args.ws_port or args.http_port or 8765
 
     client_dir = Path(__file__).resolve().parent.parent / "client"
     if not client_dir.exists():
@@ -352,37 +367,51 @@ async def async_main():
     # Pre-flight checks (each exits cleanly with a readable message on failure)
     driver_label = verify_driver_preflight(force_mock=args.mock)
     lan_ip, lan_ok = detect_lan_ip(args.ip)
-    verify_ports_preflight(args.host, args.http_port, args.ws_port)
+    verify_ports_preflight(args.host, port)
+
+    ssl_context = None
+    cert_path = None
+    if args.https:
+        try:
+            cert_path, key_path, created = ensure_lan_certificate(lan_ip)
+            ssl_context = build_ssl_context(cert_path, key_path)
+            if created:
+                print(f"[TLS] Generated self-signed certificate for {lan_ip} → {cert_path}")
+        except Exception as exc:
+            _print_error_box("Could not initialize HTTPS certificate", [
+                f"Details: {exc}",
+                "Install the `cryptography` package (pip install cryptography) or OpenSSL,",
+                "or run without --https.",
+            ])
+            sys.exit(1)
 
     # Defer virtual-device creation until the first phone connects so P1 stays free
     driver = create_gamepad_driver(force_mock=args.mock, defer_init=True)
 
+    # Unified HTTP + WebSocket server on a single port via websockets process_request
+    static_handler = build_static_process_request(client_dir)
     server = ControllerServer(
         driver=driver,
         client_dir=client_dir,
         host=args.host,
-        http_port=args.http_port,
-        ws_port=args.ws_port,
+        http_port=port,
+        ws_port=port,
         force_mock=args.mock,
+        ssl_context=ssl_context,
+        unified=True,
+        process_request=static_handler,
     )
 
-    # Start servers before printing the QR code so bind failures never show a broken banner
+    # Start unified server before printing the QR code so bind failures never show a broken banner
     try:
-        await server.start_http()
+        await server.start()
     except OSError as exc:
-        _port_in_use_box("HTTP", args.http_port, "--http-port", exc)
-        sys.exit(1)
-    try:
-        server._attach_rumble_callback()
-        await server.start_ws()
-    except OSError as exc:
-        if server.http_runner:
-            await server.http_runner.cleanup()
-        _port_in_use_box("WebSocket", args.ws_port, "--ws-port", exc)
+        _port_in_use_box("Unified HTTP/WS", port, "--port", exc)
         sys.exit(1)
 
-    print_banner(lan_ip, args.http_port, args.ws_port, driver.device_name, driver.is_mock,
-                 driver_label=driver_label, lan_ok=lan_ok)
+    print_banner(lan_ip, port, driver.device_name, driver.is_mock,
+                 driver_label=driver_label, lan_ok=lan_ok,
+                 use_https=args.https, cert_path=cert_path)
 
     # Setup shutdown event
     stop_event = asyncio.Event()

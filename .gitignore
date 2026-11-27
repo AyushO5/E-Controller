@@ -17,3 +17,8 @@ build/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Auto-generated self-signed TLS certs (--https)
+host/certs/
+*.pem
+*.key

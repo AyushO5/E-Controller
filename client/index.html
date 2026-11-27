@@ -106,6 +106,10 @@
                             <span class="latency-value" id="latency-badge">-- ms</span>
                             <span class="driver-tag" id="driver-badge" style="display:none;">Xbox 360</span>
                         </div>
+                        <div class="gyro-hud-pill" id="gyro-status-pill" aria-label="Gyroscope Status" title="Gyro status">
+                            <span class="gyro-pill-dot" aria-hidden="true"></span>
+                            <span class="gyro-pill-label">GYRO</span>
+                        </div>
                         <button class="settings-gear-btn" id="btn-settings" type="button" aria-label="Open Settings" title="Quick Settings" aria-controls="settings-drawer" aria-expanded="false">
                             <span class="settings-gear-glyph" aria-hidden="true">⚙</span>
                         </button>
@@ -126,6 +130,12 @@
                         <span class="fs-glyph">[↑]</span>
                     </button>
                 </div>
+
+                <!-- Gyro clutch (visible only when Gyro Mode active + Activation = Hold Clutch) -->
+                <button class="gyro-clutch-btn" id="btn-gyro-clutch" type="button" aria-label="Hold Gyro Clutch" hidden>
+                    <span class="clutch-reticle" aria-hidden="true">◎</span>
+                    <span class="clutch-label">GYRO</span>
+                </button>
             </section>
 
             <!-- ══ RIGHT COLUMN ═════════════════════════════════════════ -->
@@ -225,6 +235,54 @@
                     </label>
                 </div>
 
+                <!-- Motion / Gyroscope -->
+                <div class="settings-section-divider"><span>MOTION &amp; GYRO</span></div>
+
+                <div class="setting-group">
+                    <div class="setting-label-row"><span class="setting-label">Gyro Mode</span></div>
+                    <div class="segmented-toggle seg-3" id="gyro-mode-group" role="group" aria-label="Gyro Mode">
+                        <button class="seg-btn active" id="btn-gyro-off" type="button" data-gyro-mode="off" aria-pressed="true">Off</button>
+                        <button class="seg-btn" id="btn-gyro-aim" type="button" data-gyro-mode="right_stick" aria-pressed="false">Right Stick (Aim)</button>
+                        <button class="seg-btn" id="btn-gyro-steer" type="button" data-gyro-mode="left_stick_x" aria-pressed="false">Left Stick (Steer)</button>
+                    </div>
+                    <div class="gyro-warning-banner" id="gyro-sensor-warning" role="alert" hidden></div>
+                </div>
+
+                <div class="setting-group">
+                    <div class="setting-label-row"><span class="setting-label">Activation</span></div>
+                    <div class="segmented-toggle seg-3" id="gyro-activation-group" role="group" aria-label="Gyro Activation">
+                        <button class="seg-btn active" id="btn-act-lt" type="button" data-gyro-act="hold_lt" aria-pressed="true">Hold LT (ADS)</button>
+                        <button class="seg-btn" id="btn-act-clutch" type="button" data-gyro-act="hold_clutch" aria-pressed="false">Hold Clutch</button>
+                        <button class="seg-btn" id="btn-act-always" type="button" data-gyro-act="always_on" aria-pressed="false">Always On</button>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <div class="setting-label-row">
+                        <label class="setting-label" for="setting-gyro-sens">Gyro Sensitivity</label>
+                        <span class="setting-value" id="val-gyro-sens">1.2x</span>
+                    </div>
+                    <input class="setting-slider" id="setting-gyro-sens" type="range" min="0.5" max="3.0" step="0.1" value="1.2">
+                </div>
+
+                <div class="setting-group">
+                    <div class="setting-label-row">
+                        <label class="setting-label" for="setting-gyro-antidz">Game Anti-Deadzone</label>
+                        <span class="setting-value" id="val-gyro-antidz">14%</span>
+                    </div>
+                    <input class="setting-slider" id="setting-gyro-antidz" type="range" min="0" max="25" step="1" value="14">
+                </div>
+
+                <div class="setting-group setting-row-inline">
+                    <label class="setting-label" for="setting-gyro-inverty">Invert Gyro Y-Axis</label>
+                    <label class="toggle-switch">
+                        <input id="setting-gyro-inverty" type="checkbox">
+                        <span class="toggle-track" aria-hidden="true"></span>
+                    </label>
+                </div>
+
+                <button class="settings-action-btn" id="btn-gyro-calibrate" type="button">Recenter / Calibrate</button>
+
                 <!-- Reset to Defaults -->
                 <div class="settings-footer">
                     <button class="settings-reset-btn" id="btn-settings-reset" type="button">Reset to Defaults</button>
@@ -235,6 +293,7 @@
 
     <!-- Client Engine Scripts (load order: haptics → touch_engine → app) -->
     <script src="haptics.js"></script>
+    <script src="gyro_engine.js"></script>
     <script src="touch_engine.js"></script>
     <script src="app.js"></script>
 </body>

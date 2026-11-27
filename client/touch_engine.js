@@ -46,6 +46,11 @@ class TouchEngine {
         this.rx = 0;  this.ry = 0;
         this.lt = 0;  this.rt = 0;
 
+        // Normalized touch-stick floats [-1, 1] (used for additive gyro blending)
+        this.normLx = 0;  this.normLy = 0;
+        this.normRx = 0;  this.normRy = 0;
+        this._blendedState = { buttons: 0, lx: 0, ly: 0, rx: 0, ry: 0, lt: 0, rt: 0 };
+
         // ── Button pointer tracking ────────────────────────────────────────
         // Maps pointerId → Set<buttonName> (one pointer can hold multiple masks
         // only via thumb-roll, so we track per-button precisely)
@@ -113,7 +118,8 @@ class TouchEngine {
             ...document.querySelectorAll(
                 '.trigger-paddle, .bumper-paddle, .console-btn, .guide-jewel, ' +
                 '.thumbstick-housing, .stick-well, .stick-nub, .stick-concave-cap, ' +
-                '.dpad-housing, .dpad-btn, .action-diamond-housing, .face-btn, [data-button], .fullscreen-pill'
+                '.dpad-housing, .dpad-btn, .action-diamond-housing, .face-btn, [data-button], .fullscreen-pill, ' +
+                '#btn-gyro-clutch, .gyro-clutch-btn'
             )
         ].filter(Boolean);
 
@@ -374,9 +380,13 @@ class TouchEngine {
         if (side === 'left') {
             this.lx = 0;
             this.ly = 0;
+            this.normLx = 0;
+            this.normLy = 0;
         } else {
             this.rx = 0;
             this.ry = 0;
+            this.normRx = 0;
+            this.normRy = 0;
         }
 
         if (wasNonZero) {
@@ -407,8 +417,8 @@ class TouchEngine {
                 ? (this.lx !== 0 || this.ly !== 0)
                 : (this.rx !== 0 || this.ry !== 0);
 
-            if (side === 'left') { this.lx = 0; this.ly = 0; }
-            else                 { this.rx = 0; this.ry = 0; }
+            if (side === 'left') { this.lx = 0; this.ly = 0; this.normLx = 0; this.normLy = 0; }
+            else                 { this.rx = 0; this.ry = 0; this.normRx = 0; this.normRy = 0; }
 
             if (wasNonZero) {
                 window.App?.flushReturnToCenter?.();
@@ -431,9 +441,13 @@ class TouchEngine {
         if (side === 'left') {
             this.lx = Math.max(-32768, Math.min(32767, ix));
             this.ly = Math.max(-32768, Math.min(32767, iy));
+            this.normLx = nx;
+            this.normLy = ny;
         } else {
             this.rx = Math.max(-32768, Math.min(32767, ix));
             this.ry = Math.max(-32768, Math.min(32767, iy));
+            this.normRx = nx;
+            this.normRy = ny;
         }
     }
 
@@ -455,13 +469,13 @@ class TouchEngine {
         if (this._stickStates.left) {
             this._releaseStick('left');
         } else {
-            this.lx = 0; this.ly = 0;
+            this.lx = 0; this.ly = 0; this.normLx = 0; this.normLy = 0;
         }
 
         if (this._stickStates.right) {
             this._releaseStick('right');
         } else {
-            this.rx = 0; this.ry = 0;
+            this.rx = 0; this.ry = 0; this.normRx = 0; this.normRy = 0;
         }
 
         // Clear all active button flags
@@ -491,6 +505,24 @@ class TouchEngine {
             rx: this.rx, ry: this.ry,
             lt: this.lt, rt: this.rt,
         };
+    }
+
+    /**
+     * Additive blend: touch-stick + gyro per axis, clamped to [-1, 1], then int16.
+     * Reuses a single pre-allocated object (zero heap allocations per frame).
+     */
+    getBlendedState(gyroOut) {
+        const c = (v) => Math.max(-1.0, Math.min(1.0, v));
+        const i16 = (v) => Math.max(-32768, Math.min(32767, Math.round(v * 32767)));
+        const s = this._blendedState;
+        s.buttons = this.buttons;
+        s.lx = i16(c(this.normLx + (gyroOut?.lx || 0)));
+        s.ly = i16(c(this.normLy + (gyroOut?.ly || 0)));
+        s.rx = i16(c(this.normRx + (gyroOut?.rx || 0)));
+        s.ry = i16(c(this.normRy + (gyroOut?.ry || 0)));
+        s.lt = this.lt;
+        s.rt = this.rt;
+        return s;
     }
 
     /** Force-release every tracked pointer (called by app.js on SUSPEND). */

@@ -11,11 +11,16 @@ Additions:
 """
 
 import asyncio
+import email.utils
+import http
 import json
 import logging
+import mimetypes
+import ssl
 import struct
+import urllib.parse
 from pathlib import Path
-from typing import Dict, Optional, Set
+from typing import Callable, Dict, Optional, Set
 
 from aiohttp import web
 import websockets
@@ -29,6 +34,114 @@ logger = logging.getLogger("Server")
 RUMBLE_MSG_TYPE = 0x02
 RUMBLE_FRAME_FORMAT = "BBBB"   # msg_type, low_freq, high_freq, player_id
 RUMBLE_FRAME_SIZE   = struct.calcsize(RUMBLE_FRAME_FORMAT)   # 4 bytes
+
+STATIC_MIME_TYPES = {
+    ".html":        "text/html; charset=utf-8",
+    ".htm":         "text/html; charset=utf-8",
+    ".js":          "text/javascript; charset=utf-8",
+    ".mjs":         "text/javascript; charset=utf-8",
+    ".css":         "text/css; charset=utf-8",
+    ".json":        "application/json; charset=utf-8",
+    ".webmanifest": "application/manifest+json; charset=utf-8",
+    ".svg":         "image/svg+xml",
+    ".png":         "image/png",
+    ".jpg":         "image/jpeg",
+    ".jpeg":        "image/jpeg",
+    ".gif":         "image/gif",
+    ".webp":        "image/webp",
+    ".ico":         "image/x-icon",
+    ".woff":        "font/woff",
+    ".woff2":       "font/woff2",
+    ".txt":         "text/plain; charset=utf-8",
+}
+
+
+def build_static_process_request(client_dir: Path) -> Callable:
+    """
+    Create a `websockets.serve(..., process_request=...)` hook that serves
+    static files from `client_dir` for normal HTTP GET/HEAD requests (without
+    `Upgrade: websocket`) and returns `None` for WebSocket upgrades.
+    Supports both `websockets >= 13` and `websockets 12`.
+    """
+    base_dir = client_dir.resolve()
+
+    def _build_http_response(is_modern: bool, status: http.HTTPStatus,
+                             content_type: str, body: bytes,
+                             content_length: Optional[int] = None):
+        length = len(body) if content_length is None else content_length
+        raw_headers = [
+            ("Date", email.utils.formatdate(usegmt=True)),
+            ("Content-Type", content_type),
+            ("Content-Length", str(length)),
+            ("Cache-Control", "no-cache, no-store, must-revalidate"),
+            ("Pragma", "no-cache"),
+            ("Expires", "0"),
+            ("Connection", "close"),
+        ]
+        if is_modern:
+            from websockets.datastructures import Headers
+            from websockets.http11 import Response
+            return Response(status.value, status.phrase, Headers(raw_headers), body)
+        return (status, raw_headers, body)
+
+    def process_request(arg1, arg2):
+        is_modern = hasattr(arg2, "headers") and hasattr(arg2, "path")
+        if is_modern:
+            raw_path = arg2.path
+            headers = arg2.headers
+            method = getattr(arg2, "method", "GET").upper()
+        else:
+            raw_path = arg1
+            headers = arg2
+            method = "GET"
+
+        upgrade = (headers.get("Upgrade") or "").strip().lower()
+        if upgrade == "websocket":
+            return None
+
+        if method not in ("GET", "HEAD"):
+            return _build_http_response(
+                is_modern,
+                http.HTTPStatus.METHOD_NOT_ALLOWED,
+                "text/plain; charset=utf-8",
+                b"Method Not Allowed\n",
+            )
+
+        req_path = urllib.parse.unquote(urllib.parse.urlsplit(raw_path).path)
+        rel_name = "index.html" if req_path in ("", "/") else req_path.lstrip("/")
+        try:
+            safe_path = (base_dir / rel_name).resolve()
+            inside_base = safe_path.is_relative_to(base_dir)
+        except Exception:
+            safe_path = base_dir
+            inside_base = False
+
+        if not inside_base or not safe_path.is_file():
+            return _build_http_response(
+                is_modern,
+                http.HTTPStatus.NOT_FOUND,
+                "text/plain; charset=utf-8",
+                b"Not Found\n",
+            )
+
+        ext = safe_path.suffix.lower()
+        content_type = (
+            STATIC_MIME_TYPES.get(ext)
+            or mimetypes.guess_type(str(safe_path))[0]
+            or "application/octet-stream"
+        )
+        data = safe_path.read_bytes()
+        if method == "HEAD":
+            return _build_http_response(
+                is_modern,
+                http.HTTPStatus.OK,
+                content_type,
+                b"",
+                content_length=len(data),
+            )
+        return _build_http_response(is_modern, http.HTTPStatus.OK, content_type, data)
+
+    return process_request
 
 
 def _is_ws_open(websocket) -> bool:
@@ -48,7 +161,17 @@ class ControllerServer:
         http_port: int = 8080,
         ws_port: int = 8765,
         force_mock: bool = False,
+        ssl_context: Optional[ssl.SSLContext] = None,
+        unified: bool = True,
+        process_request: Optional[Callable] = None,
     ):
+        self.ssl_context = ssl_context
+        self.unified     = unified
+        self.process_request = (
+            process_request
+            if process_request is not None
+            else (build_static_process_request(client_dir) if unified else None)
+        )
         self.driver      = driver
         self.client_dir  = client_dir
         self.host        = host
@@ -304,23 +427,38 @@ class ControllerServer:
         app.router.add_get("/{filename:.+}", self._handle_static)
         self.http_runner = web.AppRunner(app)
         await self.http_runner.setup()
-        await web.TCPSite(self.http_runner, self.host, self.http_port).start()
-        print(f"[HTTP] Static server on http://{self.host}:{self.http_port}")
+        # asyncio wraps each accepted socket in TLS (server_side=True) via ssl_context
+        await web.TCPSite(self.http_runner, self.host, self.http_port,
+                          ssl_context=self.ssl_context).start()
+        scheme = "https" if self.ssl_context else "http"
+        print(f"[HTTP] Static server on {scheme}://{self.host}:{self.http_port}")
 
     async def start_ws(self):
         self.ws_server = await websockets.serve(
             self._ws_handler,
             self.host,
             self.ws_port,
+            process_request=self.process_request,
             ping_interval=10,
             ping_timeout=5,
             max_size=1024,
+            ssl=self.ssl_context,
         )
-        print(f"[WS] Input server on ws://{self.host}:{self.ws_port}")
+        if self.unified:
+            http_scheme = "https" if self.ssl_context else "http"
+            ws_scheme = "wss" if self.ssl_context else "ws"
+            print(
+                f"[Server] Unified {http_scheme.upper()}+{ws_scheme.upper()} server on "
+                f"{http_scheme}://{self.host}:{self.ws_port}"
+            )
+        else:
+            scheme = "wss" if self.ssl_context else "ws"
+            print(f"[WS] Input server on {scheme}://{self.host}:{self.ws_port}")
 
     async def start(self):
         self._attach_rumble_callback()
-        await self.start_http()
+        if not self.unified:
+            await self.start_http()
         await self.start_ws()
 
     async def stop(self):
